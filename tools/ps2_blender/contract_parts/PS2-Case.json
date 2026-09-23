@@ -4,6 +4,7 @@
   "units": "mm",
   "frame": "Case closed, standing upright, front cover facing viewer (+Z), spine on the left (-X). X = width, Y = height, Z = thickness. Root = bottom-center of bbox: X in [-67.5, 67.5], Y in [0, 190], Z in [-7, 7]. Lid = front half (Z >= split plane), hinged at the spine-front edge. Base = back half (Z <= split plane) holds hub, disc ring and memory-card holder. Positions on the base/lid inner faces are given in closed-case X/Y (and Z where 3D).",
   "size_mm": [135.0, 190.0, 14.0],
+  "nodes": ["CASE_LID", "CASE_DISC_ANCHOR", "COVER_ART", "COVER_ART_BACK", "TRADEMARK_PRINTS", "TRADEMARK_PRINTS_LID"],
   "lid_range_rad": [0, 3.1416],
   "layout": {
     "wall_mm": 1.3,
@@ -15,9 +16,9 @@
       "hinge_type": "double living hinge (PP) at both spine edges; modeled as single lid axis",
       "inner_emboss": "US PAT No 5788068 / EP PAT No 789348, JP No 2863317 (text, decorative)"
     },
-    "hinge_axis_mm": [-66.85, 95.0, 6.35],
+    "hinge_axis_mm": [-67.5, 95.0, 0.0],
     "hinge_axis_dir": [0, -1, 0],
-    "hinge_note": "Positive angle about hinge_axis_dir swings the lid free edge (+X) up toward +Z, then flat to -X at pi (inner face up).",
+    "hinge_note": "Positive angle about hinge_axis_dir swings the lid free edge (+X) up toward +Z, then flat to -X at pi (inner face up). Model: CASE_LID sits (identity rest transform) under empty CASE_LID_HINGE at the axis point, rotated pi about X so CASE_LID local +Y = world -Y; contract rot_y +pi therefore opens. Axis moved from the researched [-66.85, *, 6.35] (estimate) to the outer spine face at mid-thickness so the opened lid lies flat level with the tray (both outer faces at Z = -7) instead of 12.7 mm higher; the spine wall stays with the tray (double living hinge simplified).",
     "hub": {
       "center_mm": [-5.0, 71.0, -2.6],
       "d_mm": 15.0,

@@ -4,6 +4,7 @@
   "units": "mm",
   "frame": "Disc lying flat, label side up (+Y), data (read) side down (-Y). Root = disc center, Y=0 at mid-thickness (label surface Y=+0.6, data surface Y=-0.6). Label 2D positions below are [u, v] in mm viewed from +Y: u = +X, v = label 'up' = -Z.",
   "size_mm": [120.0, 1.2, 120.0],
+  "nodes": ["DISC_LABEL", "TRADEMARK_PRINTS"],
   "layout": {
     "center_hole_d": 15.0,
     "clamp_area_d": 33.0,

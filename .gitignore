@@ -13,3 +13,4 @@ xcuserdata/
 !/PS2_Disc_Case/
 /PS2_Model/**/*.blend1
 /PS2_Disc_Case/**/*.blend1
+__pycache__/
