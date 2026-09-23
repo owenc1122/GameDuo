@@ -1,0 +1,77 @@
+{
+  "tolerance_mm": 0.5,
+  "assets": {
+    "FixtureGood": {
+      "file": "tools/ps2_blender/tests/out/fixture.usdz",
+      "root": "FIX_ROOT",
+      "size_mm": [
+        100,
+        65,
+        100
+      ],
+      "max_tris": 100,
+      "nodes": [
+        "FIX_BODY",
+        "FIX_LID",
+        "FIX_LATCH"
+      ],
+      "motions": [
+        {
+          "node": "FIX_LID",
+          "axis": "rot_x",
+          "range_rad": [
+            -1.2,
+            0
+          ]
+        },
+        {
+          "node": "FIX_LID",
+          "axis": "loc_y",
+          "range_m": [
+            0,
+            0.02
+          ]
+        }
+      ]
+    },
+    "FixtureBadCollision": {
+      "file": "tools/ps2_blender/tests/out/fixture_bad.usdz",
+      "root": "FIX_ROOT",
+      "size_mm": [
+        100,
+        64.5,
+        100
+      ],
+      "max_tris": 100,
+      "nodes": [
+        "FIX_BODY",
+        "FIX_LID",
+        "FIX_LATCH"
+      ],
+      "motions": [
+        {
+          "node": "FIX_LID",
+          "axis": "loc_y",
+          "range_m": [
+            -0.01,
+            0
+          ]
+        }
+      ]
+    },
+    "FixtureMissing": {
+      "file": "tools/ps2_blender/tests/out/does_not_exist.usdz",
+      "root": "FIX_ROOT",
+      "size_mm": [
+        100,
+        61,
+        100
+      ],
+      "max_tris": 100,
+      "nodes": [
+        "FIX_BODY"
+      ],
+      "motions": []
+    }
+  }
+}
