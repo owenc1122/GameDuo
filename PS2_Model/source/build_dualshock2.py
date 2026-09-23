@@ -46,7 +46,7 @@ FACE_Y = K['face_plane_y_mm']          # 52: flat face deck
 BOSS_Y = 50.0                          # floor of the conical stick ring (a 25 deg cap clears it)
 RING_R0, RING_R1 = 13.0, 17.5
 POD_Y = 52.8                           # raised D-pad / face-button pods (photo: clear circular rim)
-POD_INSET, POD_RIM_R = 0.6, 0.9        # pod platform radius = POD_R - inset, rim rounding          # cone from BOSS_Y (r0) up to the face plane (r1)
+POD_INSET, POD_RIM_R = 0.6, 0.9        # pod platform radius = POD_R - inset, rim rounding
 WELL_FLOOR = 50.0                      # D-pad / face-button cross wells
 GAP = 0.3                              # radial clearance of buttons in their holes
 BODY_TRIS = 16000                      # decimation target for the SDF body
@@ -864,13 +864,19 @@ LETTER_DZ = 2.5   # L/R moved 2.5 mm back from the layout point onto the flat to
 
 
 def load_font(*names):
+    """First loadable font of `names` (in FONT_DIR); prints a WARNING for every missing /
+    unloadable file and when falling back to Blender's built-in font (None)."""
     for n in names:
         p = FONT_DIR / n
         if p.exists():
             try:
                 return bpy.data.fonts.load(str(p), check_existing=True)
-            except RuntimeError:
+            except RuntimeError as exc:
+                print(f'WARNING [dualshock2] font {p} could not be loaded ({exc}); trying next')
                 continue
+        print(f'WARNING [dualshock2] font file {p} missing; trying next fallback')
+    print(f'WARNING [dualshock2] none of {names} available in {FONT_DIR}; using Blender '
+          f'built-in font (glyph shapes will differ)')
     return None
 
 

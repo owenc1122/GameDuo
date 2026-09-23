@@ -3,14 +3,21 @@
 Run from the repo root (headless):
 
     /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup \
-        --python-exit-code 1 --python PS2_Model/source/build_console.py [-- --check] [--render]
+        --python-exit-code 1 --python PS2_Model/source/build_console.py -- --check --render
+
+All flags go after `--` (Blender's own parser stops there); each is optional.
 
 Outputs PS2_Model/exports/PS2-Console.usdz and PS2_Model/PS2-Console.blend.
 --check  after saving: proxy fit tests (memory card 42x7.5x56.5 at SLOT_MC_n, DualShock 2
          plug lip/collar/body with its 3 windows at PORT_CTRL_n, and the real memory
-         card model from PS2_Model/PS2-MemoryCard.blend) against every static mesh.
+         card model from PS2_Model/PS2-MemoryCard.blend, which must exist - build the
+         memory card first) against every static mesh; then the real PS2 DVD (built
+         from PS2_Disc_Case/source/build_dvd.py, not exported) at TRAY_DISC_ANCHOR
+         against every console mesh with the tray closed and ejected. Exits 1 on any hit.
 --render after saving: PS2_Model/renders/console_{front34,rear,tray_open}.png
          (tray_open: tray ejected, memory card inserted in slot 1).
+--closeups DIR  after saving: extra close-up renders console_cu_{right,left,tray,rear}.png
+         into DIR (a development aid for photo comparison; not used by run_all.sh).
 
 Frame (contract_parts/PS2-Console.json): console lying flat, Y up, front (fins) +Z.
 Root PS2_CONSOLE = bottom centre of the bbox; x -150.5..150.5, y 0..78, z -91..91
@@ -29,7 +36,8 @@ Body shape (REFERENCE_NOTES_console.md):
   the official 301 mm width includes the pads (estimate; the pads are graded 估计).
   Six square rubber feet y 0..1.4 under the lower tier (body bottom y = 1.0).
 
-Hierarchy (every movable node rests at location 0 / rotation 0; geometry in root space):
+Hierarchy (every movable node rests at rotation 0; loc_* motions are offsets from the
+node's rest location, which the app reads at load time; geometry in root space):
   PS2_CONSOLE
     BODY              one closed mesh: tiers, fins, cavities (tray bay, button pockets,
                       memory card slots, controller ports, grille, rear ports, bay)
@@ -111,6 +119,7 @@ TRAY_BACK = -65.0
 CAVITY_BACK = TRAY_BACK - 0.5
 DISC_C = (60.3, 18.0)                            # disc centre (x, z) with tray closed
 WELL120_FLOOR = 56.0
+DISC_FLOAT = 0.05                                # disc data face above the 120 mm well floor
 PLATE_TOP = 57.5
 
 # ports / slots
@@ -293,8 +302,12 @@ def load_font(key):
     if path and path.exists():
         try:
             return bpy.data.fonts.load(str(path), check_existing=True)
-        except RuntimeError:
-            pass
+        except RuntimeError as exc:
+            print(f'WARNING [console] font {path} could not be loaded ({exc}); '
+                  f'using Blender built-in font (glyph shapes will differ)')
+    else:
+        print(f'WARNING [console] font file {path} (key {key!r}) missing; '
+              f'using Blender built-in font (glyph shapes will differ)')
     return bpy.data.fonts.load('<builtin>', check_existing=True)
 
 
@@ -808,7 +821,9 @@ def build_tray(M, root):
     parts.append(plate)
     tray = join('DISC_TRAY', parts)
     C.set_parent(tray, root)
-    anchor = C.empty('TRAY_DISC_ANCHOR', tray, location=(dx * MM, (WELL120_FLOOR + 0.6) * MM, dz * MM))
+    # disc centre = mid-thickness: data face DISC_FLOAT above the well floor (not flush)
+    anchor = C.empty('TRAY_DISC_ANCHOR', tray,
+                     location=(dx * MM, (WELL120_FLOOR + DISC_FLOAT + 0.6) * MM, dz * MM))
     prints = C.empty('TRADEMARK_PRINTS_TRAY', tray)
     lg = LAY['logo_ps2_front']
     cx = lg['center_mm'][0]
@@ -1092,11 +1107,15 @@ def run_checks(root):
         proxies.append((f'card proxy @SLOT_MC_{n}', [card_proxy(f'_card{n}', a)]))
         p = bpy.data.objects[f'PORT_CTRL_{n}']
         proxies.append((f'plug proxy @PORT_CTRL_{n}', plug_proxy(f'_plug{n}', p)))
+    ok = True
     card_objs = append_memory_card(bpy.data.objects['SLOT_MC_1'])
     if card_objs:
         proxies.append(('real PS2-MemoryCard @SLOT_MC_1', [o for o in card_objs if o.type == 'MESH']))
+    else:
+        ok = False
+        report.append(f'  real PS2-MemoryCard @SLOT_MC_1: MISSING {MEMORY_CARD_BLEND} '
+                      f'(build PS2_Model/source/build_memory_card.py first)')
     bpy.context.view_layer.update()
-    ok = True
     for label, objs in proxies:
         hits = []
         for po in objs:
@@ -1106,6 +1125,7 @@ def run_checks(root):
                     hits.append(f'{po.name} x {so.name}: {r}')
         ok &= not hits
         report.append(f'  {label}: ' + ('clear' if not hits else '; '.join(hits)))
+    ok &= disc_in_tray_check(root, report)
     # protrusion / depth report
     print('[console] fit checks:')
     for line in report:
@@ -1121,6 +1141,44 @@ def run_checks(root):
     return ok
 
 
+def disc_in_tray_check(root, report):
+    """Real PS2 DVD (built by PS2_Disc_Case/source/build_dvd.py, so the check does not
+    depend on build order or a stale export) parented to TRAY_DISC_ANCHOR with identity
+    local transform, against every console mesh with the tray closed and ejected.
+    The disc is removed again afterwards (not part of the export / .blend)."""
+    import importlib.util
+    path = C.REPO / 'PS2_Disc_Case/source/build_dvd.py'
+    tray = bpy.data.objects['DISC_TRAY']
+    if not path.exists():
+        report.append(f'  PS2-DVD @TRAY_DISC_ANCHOR: MISSING {path}')
+        return False
+    spec = importlib.util.spec_from_file_location('build_dvd', path)
+    dvd = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dvd)
+    console_meshes = [o for o in C.descendants(root) if o.type == 'MESH']
+    disc = dvd.build()
+    C.set_parent(disc, bpy.data.objects['TRAY_DISC_ANCHOR'], keep_world=False)
+    disc.location, disc.rotation_euler = (0, 0, 0), (0, 0, 0)
+    disc_meshes = [o for o in C.descendants(disc) if o.type == 'MESH']
+    ok = True
+    for label, z in (('tray closed', 0.0), ('tray ejected', TRAVEL)):
+        tray.location.z = z
+        bpy.context.view_layer.update()
+        hits = []
+        for do in disc_meshes:
+            for co in console_meshes:
+                r = collide(do, co)
+                if r:
+                    hits.append(f'{do.name} x {co.name}: {r}')
+        ok &= not hits
+        report.append(f'  PS2-DVD @TRAY_DISC_ANCHOR, {label}: ' + ('clear' if not hits else '; '.join(hits)))
+    tray.location.z = 0.0
+    for o in reversed(C.descendants(disc)):   # children first, then the root
+        bpy.data.objects.remove(o, do_unlink=True)
+    bpy.context.view_layer.update()
+    return ok
+
+
 def iter_parents(o):
     p = o.parent
     while p is not None:
@@ -1129,13 +1187,15 @@ def iter_parents(o):
 
 
 _CARD = []
+MEMORY_CARD_BLEND = C.REPO / 'PS2_Model/PS2-MemoryCard.blend'
 
 
 def append_memory_card(anchor):
     if _CARD:
         return _CARD
-    path = C.REPO / 'PS2_Model/PS2-MemoryCard.blend'
+    path = MEMORY_CARD_BLEND
     if not path.exists():
+        print(f'[console] ERROR: {path} not found; build PS2_Model/source/build_memory_card.py first')
         return []
     with bpy.data.libraries.load(str(path)) as (src, dst):
         dst.objects = list(src.objects)
@@ -1265,4 +1325,5 @@ def main():
         sys.exit(1)
 
 
-main()
+if __name__ == '__main__':
+    main()

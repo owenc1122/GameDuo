@@ -17,7 +17,7 @@
     "max_tris": 4000,
     "motion_results": [],
     "passed": true,
-    "checked_at": "2026-09-23T03:23:27+00:00"
+    "checked_at": "2026-09-23T03:50:01+00:00"
   },
   "PS2-Case": {
     "file": "PS2_Disc_Case/exports/PS2-Case.usdz",
@@ -82,6 +82,6 @@
       }
     ],
     "passed": true,
-    "checked_at": "2026-09-23T03:28:12+00:00"
+    "checked_at": "2026-09-23T03:50:01+00:00"
   }
 }

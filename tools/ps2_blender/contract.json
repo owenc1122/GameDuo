@@ -21,7 +21,10 @@
     "PORT_CTRL_2",
     "SLOT_MC_1",
     "SLOT_MC_2",
-    "TRADEMARK_PRINTS"
+    "TRADEMARK_PRINTS",
+    "MC_DOOR_1",
+    "MC_DOOR_2",
+    "TRADEMARK_PRINTS_TRAY"
    ],
    "motions": [
     {
@@ -29,23 +32,39 @@
      "axis": "loc_z",
      "range_m": [
       0,
-      0.0
+      0.135
      ]
     },
     {
      "node": "BTN_RESET",
      "axis": "loc_z",
      "range_m": [
-      0,
-      -0.001
+      -0.001,
+      0
      ]
     },
     {
      "node": "BTN_EJECT",
      "axis": "loc_z",
      "range_m": [
+      -0.001,
+      0
+     ]
+    },
+    {
+     "node": "MC_DOOR_1",
+     "axis": "rot_x",
+     "range_rad": [
       0,
-      -0.001
+      1.5708
+     ]
+    },
+    {
+     "node": "MC_DOOR_2",
+     "axis": "rot_x",
+     "range_rad": [
+      0,
+      1.5708
      ]
     }
    ]
@@ -262,7 +281,8 @@
    ],
    "max_tris": 4000,
    "nodes": [
-    "DISC_LABEL"
+    "DISC_LABEL",
+    "TRADEMARK_PRINTS"
    ],
    "motions": []
   },
@@ -280,7 +300,11 @@
     "CASE_LID",
     "CASE_DISC_ANCHOR",
     "COVER_ART",
-    "TRADEMARK_PRINTS"
+    "COVER_ART_SPINE",
+    "COVER_ART_BACK",
+    "TRADEMARK_PRINTS",
+    "TRADEMARK_PRINTS_SPINE",
+    "TRADEMARK_PRINTS_LID"
    ],
    "motions": [
     {

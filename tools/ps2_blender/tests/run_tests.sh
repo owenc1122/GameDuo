@@ -1,6 +1,7 @@
 #!/bin/bash
-# Build the fixtures, then check validate_ps2.py and verify_scenekit.swift give the
-# expected PASS/FAIL verdicts on tests/fixture/contract.json. Exits nonzero on any mismatch.
+# Run the common.py unit tests (tests/test_common.py), build the fixtures, then check
+# validate_ps2.py and verify_scenekit.swift give the expected PASS/FAIL verdicts on
+# tests/fixture/contract.json. Exits nonzero on any failure or mismatch.
 set -u
 cd "$(dirname "$0")/../../.."
 BLENDER=${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender}
@@ -18,6 +19,13 @@ expect_code() {  # expect_code <label> <wanted> <actual>
 }
 
 mkdir -p "$OUT" && rm -f "$OUT"/fixture*.usdz "$OUT"/validation.json
+
+echo "test_common.py"
+"${B[@]}" --python tools/ps2_blender/tests/test_common.py > "$OUT/test_common.log" 2>&1
+code=$?
+tail -n 1 "$OUT/test_common.log"
+expect_code "common.py unit tests (log: $OUT/test_common.log)" 0 "$code"
+
 "${B[@]}" --python tools/ps2_blender/tests/make_fixture.py > "$OUT/make_fixture.log" 2>&1 \
     || { echo "fixture build failed, see $OUT/make_fixture.log"; exit 1; }
 

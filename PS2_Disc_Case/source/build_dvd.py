@@ -533,7 +533,8 @@ def build():
     add_ps2_wordmark(bm, wu * MM, wv * MM, ww * MM, wh * MM, Mlab)
     finish('LABEL_WORDMARK', bm, [m_ink], recalc=False, parent=prints)
 
-    # molded holograms in the clear hub ring (data side, 0.03 mm below it): 3 PS logos
+    # molded holograms in the clear hub ring (0.03 mm inside the clear plastic above the
+    # data face, so nothing hangs below the disc underside): 3 PS logos
     # alternating with 3 "PlayStation 2" wordmarks, tangential, letters' up toward the centre
     holo = L['data_side_holograms']
     rc = (holo['ring_inner_d'] + holo['ring_outer_d']) / 4 * MM
@@ -542,7 +543,7 @@ def build():
     for k in range(holo['count']):
         a = math.radians(90 + 60 * k)
         tx, tz = -math.sin(a), math.cos(a)
-        Mh = basis((rc * math.cos(a), -t - 0.03 * MM, rc * math.sin(a)),
+        Mh = basis((rc * math.cos(a), -t + 0.03 * MM, rc * math.sin(a)),
                    (tx, 0, tz), (-math.cos(a), 0, -math.sin(a)))
         if k % 2:
             add_ps2_wordmark(bm, 0, 0, 9.0 * MM, 1.8 * MM, Mh, res=1, registered=False)

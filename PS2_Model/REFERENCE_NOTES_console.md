@@ -119,6 +119,17 @@
 | ifixit_front_left_ports_1600.jpg | https://www.ifixit.com/Teardown/Sony+PlayStation+2+Teardown/1250 （第 1 步，igi/cgH5rrus13xmGFdH） | iFixit CC BY-NC-SA 3.0 | 近正视：存储卡槽、手柄口、USB、i.LINK 的比例 |
 | ifixit_front_right_buttons_1600.jpg | 同上（igi/MBtZPKgOyS4hyNDu） | iFixit CC BY-NC-SA 3.0 | 近正视：RESET/OPEN、LED、SONY、托盘分缝 |
 
+`PS2_Model/references/` 根目录下还有几张较早下载的主机照片（2026-09-22 用 Commons API 按文件名与图像比对确认来源，与 Commons 缩略图逐像素一致，差异只来自重新压缩）：
+
+| 文件 | 原始 URL | 作者 / 许可 | 用途 |
+|---|---|---|---|
+| scph30001_back_evanamos.jpg | https://commons.wikimedia.org/wiki/File:PS2-Fat-Console-Back.jpg | Evan-Amos / Public domain | 与 `console/scph30001_back_evanamos_3840.jpg` 同一原图的 1600 宽版本（重复，测量以 3840 版为准） |
+| scph30001_fl_evanamos.jpg | https://commons.wikimedia.org/wiki/File:Sony-PlayStation-2-30001-Console-FL.jpg | Evan-Amos / Public domain | 与 `console/scph30001_FL_evanamos_1920.jpg` 同一原图的 1600 宽版本（重复） |
+| scph30001_set_evanamos.jpg | https://commons.wikimedia.org/wiki/File:PS2-Fat-Console-Set.jpg | Evan-Amos / Public domain | 主机 + 手柄 + 记忆卡合影：整体比例、颜色对照 |
+| scph30007r_front.jpg | https://commons.wikimedia.org/wiki/File:SCPH-30007R_front_view_20210103.jpg | Solomon203 / CC BY-SA 4.0（原图，字节一致） | 插着记忆卡的前面：记忆卡外露约 15 mm（估计）、OPEN LED 蓝色 |
+| scph30007r_rear.jpg | https://commons.wikimedia.org/wiki/File:SCPH-30007R_rear_view_20210103.jpg | Solomon203 / CC BY-SA 4.0 | 背面贴纸、扩展仓盖、风扇格栅、电源开关布局核对 |
+| scph5001_eject_reset_deniwilliams.jpg | https://commons.wikimedia.org/wiki/File:Sony_Playstation_2_SCPH-5001_V9_-_Bot%C3%B5es_Eject_e_Reset_Eject_and_Reset_buttons_(19290929960).jpg | Deni Williams / CC BY 2.0 | RESET / EJECT 键与图标、LED 位置特写（SCPH-50001 同款前面板） |
+
 另外参考过但没有放进仓库的资料：
 - SCPH-30001 说明书封面线图（只说明布局关系，比例不准）。
 - iFixit 光驱照片（用来推算托盘行程）。

@@ -82,6 +82,14 @@
 | ds2_plug_front_iagoqnsi_hs2.jpg | https://commons.wikimedia.org/wiki/File:DualShock_2_controller_plug_HS2.jpg | IagoQnsi / CC BY 4.0 |
 | ds2_cable_plug_yolanc.jpg | https://commons.wikimedia.org/wiki/File:Game_controller_PlayStation_2.jpg | YolanC / CC BY-SA 2.5 |
 
+`PS2_Model/references/` 根目录下的手柄照片（Commons API 按文件名与图像比对确认来源）：
+
+| 文件 | 原图 | 作者 / 许可 |
+|---|---|---|
+| dualshock2_evanamos.jpg | https://commons.wikimedia.org/wiki/File:PS2-DualShock2.jpg | Evan-Amos / Public domain |
+| dualshock2_plug_hs1.jpg | https://commons.wikimedia.org/wiki/File:DualShock_2_controller_plug_HS1.jpg | Hayden Schiff / CC BY 4.0 |
+| dualshock2_rear_solomon203.jpg | https://commons.wikimedia.org/wiki/File:SCPH-10010_rear_20210313.jpg | Solomon203 / CC BY-SA 4.0；底面螺丝位置与沉孔（`build_dualshock2.py` 的螺丝表由此读取） |
+
 尺寸线稿 https://cdn.prod.website-files.com/5b44edefca321a1e2d0c2aa6/5e5f3b92845bab20bdcf14a8_Dimensions-Guide-Digital-Video-Game-Controllers-DualShock-2-Dimensions.svg （dimensions.com，有版权）只用来测量，没有放进仓库。
 
 ## 其他查过的来源

@@ -30,7 +30,16 @@
 
 ## SceneKit 接入约定
 
-所有可动节点的静止姿态为位置 0、旋转 0（需要倾斜的部件把倾角放在父级 `*_MOUNT` 空节点上）；表中的轴是该节点在父节点空间中的本地轴，运动时直接写 `position` 或 `eulerAngles` 的对应分量。范围两端都已通过穿模检查（`validation.json`）。
+表中的轴是该节点在父节点空间中的本地轴。范围两端都已通过穿模检查（`validation.json`）。
+
+- **旋转（`rot_*`）**：节点的静止旋转为 0（需要倾斜的部件把倾角放在父级 `*_MOUNT` 空节点上），范围就是 `eulerAngles` 对应分量的绝对值，直接写入即可。节点位置是枢轴（铰链、球心）所在处，不是 0，不要改写。
+- **平移（`loc_*`）**：范围是相对节点**静止位置**的**偏移量**，不是绝对坐标。静止位置一般不是 0（例如 `BTN_CROSS` 静止在 (46.5, 55.0, −0.3) mm，`STICK_L` 在 (−23, 44, 10.5) mm）；主机的 `DISC_TRAY`、`BTN_RESET`、`BTN_EJECT` 目前恰好静止在 0，但同样按偏移处理。App 载入场景后先读出并保存每个可动节点的 `restPosition = node.position`，之后写 `position = restPosition + axis * value`：
+
+```swift
+let node = scene.rootNode.childNode(withName: "BTN_CROSS", recursively: true)!
+let restPosition = node.position   // 载入后立即读取并保存，不要假定为 0
+node.position = SCNVector3(restPosition.x, restPosition.y + Float(value), restPosition.z)  // loc_y，value ∈ [-0.002, 0]
+```
 
 USD 导入器会把**带子节点的网格**拆成 transform 节点 `NAME` 和几何子节点 `NAME_mesh`（例如 `BTN_RESET` → `BTN_RESET` + `BTN_RESET_mesh`，`DISC_TRAY` → `DISC_TRAY` + `DISC_TRAY_mesh`）。移动时操作 `NAME`；换材质时找带 geometry 的节点，即 `NAME` 本身或其 `NAME_mesh` 子节点。节点名在各自资产内唯一，用 `childNode(withName:recursively: true)` 查找。
 
@@ -38,14 +47,14 @@ USD 导入器会把**带子节点的网格**拆成 transform 节点 `NAME` 和�
 
 | 节点 | 作用 | 轴 / 范围 |
 |---|---|---|
-| `DISC_TRAY` | 光驱托盘（含托盘面板、120/80 mm 盘槽） | 本地 Z 平移，0（收回）→ `0.135` m（弹出） |
-| `TRAY_DISC_ANCHOR` | 空节点，`DISC_TRAY` 子节点；光盘圆心（厚度中点）落在 120 mm 盘槽上的位置 | 静止；把 `PS2_DVD` 以单位变换挂到这里即为标签面朝上放在托盘上 |
+| `DISC_TRAY` | 光驱托盘（含托盘面板、120/80 mm 盘槽） | 本地 Z 平移，偏移 0（收回）→ +0.135 m（弹出） |
+| `TRAY_DISC_ANCHOR` | 空节点，`DISC_TRAY` 子节点；光盘圆心（厚度中点）落在 120 mm 盘槽上的位置（数据面离槽底 0.05 mm，`--check` 在托盘收回、弹出两端验证光盘无穿模） | 静止；把 `PS2_DVD` 以单位变换挂到这里即为标签面朝上放在托盘上 |
 | `TRADEMARK_PRINTS_TRAY` | `DISC_TRAY` 子节点；托盘面板上的彩色 PS 标志（随托盘移动，所以不能放在 `TRADEMARK_PRINTS` 下） | — |
-| `BTN_RESET` | RESET/电源键（有 `BTN_RESET_mesh` 几何子节点） | 本地 Z 平移，0 → `-0.001` m（按下） |
-| `BTN_EJECT` | EJECT 键（有 `BTN_EJECT_mesh` 几何子节点） | 本地 Z 平移，0 → `-0.001` m |
+| `BTN_RESET` | RESET/电源键（有 `BTN_RESET_mesh` 几何子节点） | 本地 Z 平移，偏移 0 → −0.001 m（按下） |
+| `BTN_EJECT` | EJECT 键（有 `BTN_EJECT_mesh` 几何子节点） | 本地 Z 平移，偏移 0 → −0.001 m |
 | `LED_POWER` | 电源指示灯镜片，**`BTN_RESET` 的子节点**（实机导光柱是键帽的一部分，随键移动） | 材质 `LED_POWER_off`（#2B1C1C）；待机红 `#FF2A1A`，开机绿 `#35E06A` |
 | `LED_EJECT` | 弹出指示灯镜片，**`BTN_EJECT` 的子节点** | 材质 `LED_EJECT_off`（#1C1F2B）；亮起蓝 `#3A7BFF` |
-| `MC_DOOR_1`、`MC_DOOR_2` | 记忆卡槽弹簧门（印 MEMORY CARD），原点在铰链线 (x, 65.45, 89.6) mm | 本地 X 旋转，0（关闭）→ `π/2`（向内上翻进门袋） |
+| `MC_DOOR_1`、`MC_DOOR_2` | 记忆卡槽弹簧门（印 MEMORY CARD），原点在铰链线 (x, 65.45, 89.6) mm | 本地 X 旋转，0（关闭）→ `π/2`（向内上翻进门袋）；位置保持不动 |
 | `SLOT_MC_1`、`SLOT_MC_2` | 空节点；记忆卡完全插入时 `PS2_MEMORY_CARD` 根节点的位姿，位于 (−100.8 / −50.3, 61.5, 49.5) mm | 静止 |
 | `PORT_CTRL_1`、`PORT_CTRL_2` | 空节点；手柄插头完全插入时 `CTRL_PLUG` 的位姿，位于 (−100.8 / −50.3, 47.0, 82.3) mm | 静止 |
 | `TRADEMARK_PRINTS` | 其余全部印刷：顶面蓝色 PS2 标志与 “PlayStation 2” 凸字、银色竖排 SONY、背面贴纸、光盘格式条、“1 / MagicGate / 2”、接口标记、蓝色面板图标、背面接口文字、保修封条、EXPANSION BAY | — |
@@ -60,12 +69,12 @@ USD 导入器会把**带子节点的网格**拆成 transform 节点 `NAME` 和�
 | 节点 | 作用 | 轴 / 范围 |
 |---|---|---|
 | `DPAD` | 一体十字键，支点在 (−46.5, 50.5, −12.5) mm | 本地 X、Z 旋转，各 `±0.0873` rad（±5°）；按哪个方向就向哪边倾 |
-| `BTN_TRIANGLE`、`BTN_CIRCLE`、`BTN_CROSS`、`BTN_SQUARE` | △（绿）○（红）×（蓝）□（粉）面键，符号在键帽几何里 | 本地 Y 平移，0 → `-0.002` m |
-| `BTN_SELECT`、`BTN_START` | SELECT / START | 本地 Y 平移，0 → `-0.001` m |
-| `BTN_ANALOG` | ANALOG 键 | 本地 Y 平移，0 → `-0.0008` m |
+| `BTN_TRIANGLE`、`BTN_CIRCLE`、`BTN_CROSS`、`BTN_SQUARE` | △（绿）○（红）×（蓝）□（粉）面键，符号在键帽几何里；静止位置在各键中心（y = 55 mm） | 本地 Y 平移，偏移 0 → −0.002 m |
+| `BTN_SELECT`、`BTN_START` | SELECT / START | 本地 Y 平移，偏移 0 → −0.001 m |
+| `BTN_ANALOG` | ANALOG 键 | 本地 Y 平移，偏移 0 → −0.0008 m |
 | `LED_ANALOG` | 模拟模式指示灯（根节点直接子节点） | 材质 `LED_ANALOG_off`（#4A0E0C）；亮起红 `#FF2B1C` |
-| `STICK_L`、`STICK_R` | 左右摇杆，支点在球心 (∓23, 44, 10.5) mm | 本地 X、Z 旋转，各 `±0.4363` rad（±25°）；本地 Y 平移 0 → `-0.0008` m 为 L3/R3 |
-| `L1`、`R1` | L1/R1，挂在 `L1_MOUNT` / `R1_MOUNT` 下（父级绕 X 转 −90°，本地 −Y = 世界 +Z，即压进机身的方向） | 本地 Y 平移，0 → `-0.002` m |
+| `STICK_L`、`STICK_R` | 左右摇杆，支点在球心 (∓23, 44, 10.5) mm | 本地 X、Z 旋转，各 `±0.4363` rad（±25°）；本地 Y 平移偏移 0 → −0.0008 m 为 L3/R3 |
+| `L1`、`R1` | L1/R1，挂在 `L1_MOUNT` / `R1_MOUNT` 下（父级绕 X 转 −90°，本地 −Y = 世界 +Z，即压进机身的方向） | 本地 Y 平移，偏移 0 → −0.002 m |
 | `L2`、`R2` | L2/R2，铰链在 (∓46.5, 28, −40) mm | 本地 X 旋转，0 → `-0.1396` rad（−8°，扳机向机身方向扣下） |
 | `CABLE` | 从机身出线口到插头的一段静态线缆（含磁环） | 静态；插头移走后线缆不会跟随，App 插线时可隐藏 |
 | `CTRL_PLUG` | 手柄插头，原点在插入端面中心，沿本地 −Z 插入；挂在 `CTRL_PLUG_MOUNT` 下（静止时放在手柄前方桌面上） | 插入主机：把 `CTRL_PLUG` 的世界变换设为 `PORT_CTRL_n` 的世界变换（或以单位变换挂到 `PORT_CTRL_n` 下） |
@@ -124,7 +133,7 @@ REFERENCE_NOTES 中每个数值都标有等级：**官方**（Sony 说明书）�
 - **主机**：只有外形 301 × 78 × 182、质量 2.2 kg、接口种类数量、LED 红/绿色是官方数据。鳍片、上下层、接口、按键位置为照片校准（整体约 ±1.5 mm，小部件约 ±2 mm，被悬挑遮挡处约 ±4 mm）。托盘行程 135 mm 由照片推算（可能 128–145）；托盘长度、扩展仓深度、侧面垫位置、按键与接口内部深度、记忆卡外露 15 mm 均为估计。
 - **DualShock 2**：外形 157 × 95、重量为交叉验证；按键 X/Z 布局约 ±1.5 mm，高度方向约 ±3 mm（线稿前视与侧视自身差约 3 mm）。所有行程、摇杆与 L2/R2 转轴、插头主体尺寸、磁环为工程估计，可能差 30% 以上。
 - **记忆卡**：宽 42、厚 7.5 为两个独立社区 CAD 交叉验证；长 56.5 为三张照片长宽比（约 ±1 mm）；印刷位置约 ±0.5 mm；接口窗口、隔筋、防呆为估计。
-- **印刷字形**：PS 标志、SONY、“PlayStation 2” 字标、SELECT/START、L/R、面键符号和方向键箭头来自共享矢量 `tools/ps2_blender/vectors/`（Sony 官方手册矢量或 Wikimedia Commons，见该目录 `README.md`）。没有公开矢量的字样用系统字体近似：主机 RESET、MEMORY CARD、MagicGate、1/2、S400、背面文字和贴纸小字用 Arial / Arial Bold；手柄 “DUALSHOCK 2”、“ANALOG” 用 Arial Bold / Arial；记忆卡 8MB、MEMORY CARD 用 Helvetica，MagicGate 从照片描摹。字体字形为近似，大小和位置按照片拟合。
+- **印刷字形**：PS 标志、SONY、“PlayStation 2” 字标、SELECT/START、L/R、面键符号和方向键箭头来自共享矢量 `tools/ps2_blender/vectors/`（Sony 官方手册矢量或 Wikimedia Commons，见该目录 `README.md`）。没有公开矢量的字样用系统字体近似：主机 RESET、MEMORY CARD、MagicGate、1/2、S400、背面文字和贴纸小字用 Arial / Arial Bold；手柄 “DUALSHOCK 2”、“ANALOG” 用 Arial Bold / Arial；记忆卡 8MB、MEMORY CARD 用 Helvetica，MagicGate 从照片描摹。字体字形为近似，大小和位置按照片拟合。找不到字体文件时，主机和手柄脚本会打印 `WARNING ... font file ... missing` 并退回 Blender 内置字体（记忆卡脚本同样打印提示），此时字形会明显不同，重建日志里应检查有没有这类警告。
 - 所有颜色都是照片近似值，没有色度计数据。不在范围内：实机测量、生产丝印母版。
 
 ## 重建方法
@@ -136,7 +145,7 @@ tools/ps2_blender/run_all.sh            # 重建五个 PS2 资产并运行全部
 tools/ps2_blender/run_all.sh --render   # 另外输出主机、手柄、记忆卡的检查渲染
 ```
 
-脚本按顺序（M2 只有 8 GB 内存，Blender 一次只开一个）执行：记忆卡 → DualShock 2 → 主机（带 `--check`，用记忆卡 `.blend` 和手柄插头代理做插槽配合检查，因此记忆卡必须先建）→ DVD → 光盘盒；然后运行 `tools/ps2_blender/tests/run_tests.sh`（校验器自测）、`validate_ps2.py`（全部资产，更新 `validation.json`）和 `verify_scenekit.swift`（SceneKit 实际载入、找节点、执行每个动作）。任一步失败则退出码非 0；日志在 `build/ps2_logs/`。
+脚本按顺序（M2 只有 8 GB 内存，Blender 一次只开一个）执行：记忆卡 → DualShock 2 → 主机（带 `--check`，用记忆卡 `.blend` 和手柄插头代理做插槽配合检查，记忆卡 `.blend` 不存在时检查失败，因此记忆卡必须先建；另外用 `PS2_Disc_Case/source/build_dvd.py` 现建一张光盘，在托盘收回和弹出时检查光盘与主机无穿模）→ DVD → 光盘盒；然后运行 `tools/ps2_blender/tests/run_tests.sh`（校验器自测）、`validate_ps2.py`（全部资产，更新 `validation.json`）和 `verify_scenekit.swift`（SceneKit 实际载入、找节点、执行每个动作）。任一步失败则退出码非 0；日志在 `build/ps2_logs/`。
 
 单独构建某个资产：
 
@@ -144,7 +153,7 @@ tools/ps2_blender/run_all.sh --render   # 另外输出主机、手柄、记忆�
 B="/Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python-exit-code 1"
 $B --python PS2_Model/source/build_memory_card.py [-- --render]
 $B --python PS2_Model/source/build_dualshock2.py [-- --render]
-$B --python PS2_Model/source/build_console.py [-- --check] [--render]
+$B --python PS2_Model/source/build_console.py -- --check --render   # 参数都放在 -- 之后，均可省略
 $B --python tools/ps2_blender/validate_ps2.py -- --only PS2-Console
 xcrun swift tools/ps2_blender/verify_scenekit.swift --only PS2-Console
 ```

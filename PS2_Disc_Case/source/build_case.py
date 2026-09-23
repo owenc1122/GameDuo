@@ -22,21 +22,25 @@ Nodes
   PS2_CASE                          root empty
     CASE_TRAY                       empty: static back half
       TRAY_SHELL                    black PP back half (rounded corners, bevelled edges)
-      HUB_ROSETTE                   seat, 6 rosette fingers, triangular button (+PUSH emboss)
+      HUB_ROSETTE                   seat, 6 rosette fingers, triangular button (+PUSH emboss);
+                                    seat and spokes stop HUB_CLEAR below the disc underside
       DISC_RING                     4 raised retaining arcs around the disc
-      MEMCARD_HOLDER, TRAY_EMBOSS   corner brackets; embossed arrow / MEMORY CARD
-                                    HOLDER / AMARAY / PUSH (PS logo: TRADEMARK_PRINTS)
+      MEMCARD_HOLDER, TRAY_EMBOSS   corner brackets (inner 57.0 x 42.5 = card + 0.5 play);
+                                    embossed arrow / MEMORY CARD HOLDER / PUSH (the PS logo
+                                    and the AMARAY maker mark are trademarks: TRADEMARK_PRINTS)
       SLEEVE_BACK, COVER_ART_BACK   clear film and insert back panel
       TRAY_HINGE_WEB                living-hinge strip (the lid has LID_HINGE_WEB)
       CASE_DISC_ANCHOR              empty at the hub, disc centre, rotated +90 deg about X
                                     so the disc's +Y (label) faces +Z (the lid)
     TRADEMARK_PRINTS                top-level print group: TRAY_PS_LOGO_EMBOSS (embossed PS
-                                    logo on the tray floor); moving prints are in the
-                                    SPINE / LID groups below
+                                    logo on the tray floor) and TRAY_AMARAY_EMBOSS (embossed
+                                    AMARAY maker mark); moving prints are in the SPINE / LID
+                                    groups below
     CASE_SPINE_HINGE                empty ON the back hinge line, rotated pi about X so
                                     its local +Y = world -Y (contract hinge_axis_dir)
       CASE_SPINE                    identity rest transform = runtime pivot; +rot_y opens
-        SPINE_PANEL, SPINE_DETAIL   spine wall; inner ribs + patent emboss
+        SPINE_PANEL                 spine wall
+        SPINE_RIBS, SPINE_EMBOSS    two inner lengthwise ribs; inner patent-number emboss
         SLEEVE_SPINE, COVER_ART_SPINE
         TRADEMARK_PRINTS_SPINE      black band, white box + colour PS logo, wordmark
         CASE_LID                    at the front hinge line (local (0, 0, -14 mm)), zero
@@ -51,7 +55,9 @@ Insert UV space (one image for COVER_ART + COVER_ART_SPINE + COVER_ART_BACK), 27
   v = 0 bottom .. 1 top (insert Y 3.5 .. 186.5 mm).
 Logos come from tools/ps2_blender/vectors (official outlines); the small embossed
 texts (MEMORY CARD HOLDER, PUSH, AMARAY, patent numbers) have no vector and use
-Blender's built-in font.
+Blender's built-in font. Self-check (printed as `self-check ...`, exits 1 on a hit): the
+four hinge poses, the real disc at CASE_DISC_ANCHOR and a 56.5 x 42 x 7.5 memory-card
+proxy in the holder, both against every case mesh with the case closed.
 """
 import importlib.util
 import math
@@ -92,11 +98,21 @@ SPINE_TOP_X = -67.25
 INSERT_W, INSERT_H = 273.0, 183.0
 INSERT_Y0 = 3.5
 BACK_HINGE = (-67.5, 95.0, -7.0)
+HUB_CLEAR = 0.05                  # hub seat / spoke tops below the disc data face
+MC_PLAY = 0.5                     # memory-card holder: inner size = card + play
+MC_WALL = 1.2                     # holder bracket wall thickness (outside the inner size)
+MC_CARD = (56.5, 7.5, 42.0)       # PS2 memory card lying flat in the holder: X, Z, Y (mm)
 FRONT_HINGE = (-67.5, 95.0, 7.0)
 
 
 def m(v):
     return v * MM
+
+
+def memcard_inner(mc):
+    """Holder inner size (X, Y) mm = the card it holds + MC_PLAY."""
+    fx, fy = mc['fits_card_mm']
+    return fx + MC_PLAY, fy + MC_PLAY
 
 
 def box_obj(name, x0, x1, y0, y1, z0, z1, mats, uv_fn=None, parent=None):
@@ -183,21 +199,22 @@ def build():
     # hub: base disc, seat (disc rests on its top), 6 rosette fingers, button
     hub = L['hub']
     hx, hy = hub['center_mm'][0], hub['center_mm'][1]
-    seat_z = hub['disc_seat_z_mm']                           # -3.2
+    seat_z = hub['disc_seat_z_mm']                           # -3.2 = disc data face
+    top_z = seat_z - HUB_CLEAR                               # seat / spoke tops, under the disc
     bm = D.new_bm()
     D.add_prism(bm, [(m(x), m(y)) for x, y in circle(hx, hy, hub['platform_d_mm'] / 2)],
                 m(floor_z - 0.05), m(floor_z + 0.6))
     D.add_prism(bm, [(m(x), m(y)) for x, y in circle(hx, hy, 16.5)],
-                m(floor_z + 0.6), m(seat_z))
+                m(floor_z + 0.6), m(top_z))
     for k in range(hub['rosette_fingers']):
         a = math.radians(30 + 60 * k)
         R = Matrix.Translation((m(hx), m(hy), 0)) @ Matrix.Rotation(a, 4, 'Z')
-        D.add_box(bm, m(4.0), m(7.3), m(-1.4), m(1.4), m(seat_z - 0.05), m(-1.35), R)
+        D.add_box(bm, m(4.0), m(7.3), m(-1.4), m(1.4), m(top_z - 0.05), m(-1.35), R)
         D.add_box(bm, m(6.6), m(7.8), m(-1.4), m(1.4), m(-1.9), m(-1.35), R)
-        D.add_box(bm, m(9.0), m(17.5), m(-0.5), m(0.5), m(seat_z - 0.05), m(seat_z + 0.35), R)
+        D.add_box(bm, m(9.0), m(17.5), m(-0.5), m(0.5), m(floor_z + 0.55), m(top_z), R)  # ribs
     tri = [(m(hx + 3.6 * math.cos(math.radians(90 + 120 * k))),
             m(hy + 3.6 * math.sin(math.radians(90 + 120 * k)))) for k in range(3)]
-    D.add_prism(bm, tri, m(seat_z - 0.05), m(-1.6))
+    D.add_prism(bm, tri, m(top_z - 0.05), m(-1.6))
     D.finish('HUB_ROSETTE', bm, [plastic], smooth_angle=35, parent=tray)
 
     # segmented retaining ring around the disc
@@ -209,20 +226,22 @@ def build():
                   m(floor_z - 0.05), m(floor_z + ring['height_above_floor_mm']), n=12)
     D.finish('DISC_RING', bm, [plastic], smooth_angle=35, parent=tray)
 
-    # memory-card holder: 4 corner L-brackets
+    # memory-card holder: 4 corner L-brackets whose walls stand OUTSIDE the inner size
+    # (card 56.5 x 42 in X x Y + MC_PLAY), so the inner pocket really fits a card
     mc = L['memory_card_holder']
-    (mx, my), (mw, mh) = mc['center_mm'], mc['outer_size_mm']
+    (mx, my), (iw, ih) = mc['center_mm'], memcard_inner(mc)
     top = floor_z + mc['wall_height_mm']
-    t = 1.2
+    t = MC_WALL
     bm = D.new_bm()
     for sx in (-1, 1):
         for sy in (-1, 1):
-            cx, cy = mx + sx * mw / 2, my + sy * mh / 2
-            ax = sorted((cx, cx - sx * 17))
-            ay = sorted((cy, cy - sy * 12))
-            D.add_box(bm, m(ax[0]), m(ax[1]), m(min(cy, cy - sy * t)), m(max(cy, cy - sy * t)),
+            cx, cy = mx + sx * iw / 2, my + sy * ih / 2           # inner corner
+            ox, oy = cx + sx * t, cy + sy * t                     # outer corner
+            ax = sorted((ox, ox - sx * 17))
+            ay = sorted((oy, oy - sy * 12))
+            D.add_box(bm, m(ax[0]), m(ax[1]), m(min(cy, oy)), m(max(cy, oy)),
                       m(floor_z - 0.05), m(top))
-            D.add_box(bm, m(min(cx, cx - sx * t)), m(max(cx, cx - sx * t)), m(ay[0]), m(ay[1]),
+            D.add_box(bm, m(min(cx, ox)), m(max(cx, ox)), m(ay[0]), m(ay[1]),
                       m(floor_z - 0.05), m(top))
     D.finish('MEMCARD_HOLDER', bm, [plastic], parent=tray)
 
@@ -239,10 +258,13 @@ def build():
                     (m(mx - 17.5), m(my + 10.5))], Me)
     D.add_text(bm, 'MEMORY CARD', m(mx + 1), m(my - 5.5), m(30.0), m(3.4), Me, res=1)
     D.add_text(bm, 'HOLDER', m(mx + 1), m(my - 10.5), m(16.5), m(3.4), Me, res=1)
-    D.add_text(bm, 'AMARAY', m(-55.0), m(22.0), m(12.0), m(2.2), Me, res=1)
     Mb = D.basis((0, 0, m(-1.58)), (1, 0, 0), (0, 1, 0))
     D.add_text(bm, 'PUSH', m(hx), m(hy - 0.6), m(3.0), m(0.9), Mb, res=1)
     D.finish('TRAY_EMBOSS', bm, [emboss], recalc=False, parent=tray)
+    # AMARAY is the case maker's trademark: own mesh in TRADEMARK_PRINTS, hidden with it
+    bm = D.new_bm()
+    D.add_text(bm, 'AMARAY', m(-55.0), m(22.0), m(12.0), m(2.2), Me, res=1)
+    D.finish('TRAY_AMARAY_EMBOSS', bm, [emboss], recalc=False, parent=prints_root)
 
     # film (back) and insert back panel
     box_obj('SLEEVE_BACK', X0 + 0.2, SLEEVE_OPEN_X, 0.2, 189.8, -ZF, -ZF + SLEEVE_T, [sleeve],
@@ -355,8 +377,8 @@ def build():
 
 
 # ------------------------------------------------------------ self check
-def group_collisions(root):
-    """Pairwise triangle overlaps between tray / spine / lid meshes in the current pose."""
+def case_groups(root):
+    """Case meshes split into the three rigid groups tray / spine / lid."""
     spine, lid = bpy.data.objects['CASE_SPINE'], bpy.data.objects['CASE_LID']
     lid_set = set(C.descendants(lid))
     spine_set = set(C.descendants(spine)) - lid_set
@@ -364,6 +386,13 @@ def group_collisions(root):
     for o in C.descendants(root):
         if o.type == 'MESH':
             groups['lid' if o in lid_set else 'spine' if o in spine_set else 'tray'].append(o)
+    return groups
+
+
+def group_collisions(root, groups=None):
+    """Pairwise triangle overlaps between meshes of different groups in the current pose
+    (default groups: tray / spine / lid of the case under `root`)."""
+    groups = groups or case_groups(root)
     bpy.context.view_layer.update()
     dg = bpy.context.evaluated_depsgraph_get()
     trees = {}
@@ -383,6 +412,28 @@ def group_collisions(root):
             if trees[a][0] != trees[b][0] and trees[a][1].overlap(trees[b][1]):
                 hits.append(f'{a}x{b}')
     return hits
+
+
+def contents_check(root, disc_root):
+    """Case closed: the disc (parented to CASE_DISC_ANCHOR) and a memory-card proxy box
+    (MC_CARD, lying on the tray floor centred in the holder) against every case mesh.
+    Returns {label: collision list}; the proxy is deleted afterwards."""
+    L = C.load_contract('PS2-Case')['layout']
+    mc = L['memory_card_holder']
+    (mx, my), (cw, ct, ch) = mc['center_mm'], MC_CARD
+    floor_z = -PL_Z + WALL
+    card = box_obj('_MC_PROXY', mx - cw / 2, mx + cw / 2, my - ch / 2, my + ch / 2,
+                   floor_z + 0.2, floor_z + 0.2 + ct, [])      # clears the 0.15 mm embosses
+    case_meshes = [o for g in case_groups(root).values() for o in g]
+    disc_meshes = [o for o in C.descendants(disc_root) if o.type == 'MESH']
+    out = {
+        'disc': group_collisions(root, {'case': case_meshes, 'disc': disc_meshes}),
+        'memory card proxy': group_collisions(root, {'case': case_meshes, 'card': [card]}),
+    }
+    iw, ih = memcard_inner(mc)
+    print(f'self-check memory card holder inner {iw:.1f} x {ih:.1f} mm for a {cw} x {ch} mm card')
+    bpy.data.objects.remove(card, do_unlink=True)
+    return out
 
 
 def test_pattern(w_px=1092, h_px=732):
@@ -420,15 +471,24 @@ def main():
 
     spine, lid = bpy.data.objects['CASE_SPINE'], bpy.data.objects['CASE_LID']
     half = math.pi / 2
+    failed = False
     for a, b in ((0, 0), (half, 0), (0, half), (half, half)):
         spine.rotation_euler[1], lid.rotation_euler[1] = a, b
-        print(f'self-check spine={a:.4f} lid={b:.4f}: collisions {group_collisions(root) or "none"}')
+        hits = group_collisions(root)
+        failed |= bool(hits)
+        print(f'self-check spine={a:.4f} lid={b:.4f}: collisions {hits or "none"}')
     spine.rotation_euler[1] = lid.rotation_euler[1] = 0.0
 
-    # .blend: the disc sits on the hub anchor (not part of the export)
+    # the disc sits on the hub anchor (in the .blend only, not part of the export)
     disc = D.build()
     C.set_parent(disc, bpy.data.objects['CASE_DISC_ANCHOR'], keep_world=False)
     disc.location, disc.rotation_euler = (0, 0, 0), (0, 0, 0)
+    for label, hits in contents_check(root, disc).items():
+        failed |= bool(hits)
+        print(f'self-check {label} in closed case: collisions {hits or "none"}')
+    if failed:
+        print('self-check FAILED')
+        sys.exit(1)
 
     cam = D.setup_render(res=(1024, 768), samples=32, world_rgb=(0.11, 0.115, 0.13))
     D.area_light('KeyLight', (-0.2, 0.45, 0.55), (0, 0.095, 0), 0.4, 3.2)

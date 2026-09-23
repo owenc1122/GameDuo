@@ -38,8 +38,10 @@
     },
     "memory_card_holder": {
       "center_mm": [-5.0, 159.5],
-      "outer_size_mm": [56.6, 46.3],
+      "outer_size_mm": [59.4, 44.9],
+      "inner_size_mm": [57.0, 42.5],
       "fits_card_mm": [56.5, 42.0],
+      "size_note": "build_case.py derives the pocket from fits_card_mm + 0.5 mm play (inner 57.0 x 42.5) with 1.2 mm bracket walls outside it (outer 59.4 x 44.9). The photo-scaled outline was 56.6 x 46.3, whose 54.2 mm inner length could not hold the 56.5 mm card.",
       "wall_height_mm": 4.0,
       "emboss": "PS logo + 'MEMORY CARD HOLDER' + left-pointing arrow"
     },

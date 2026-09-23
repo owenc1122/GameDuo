@@ -1,7 +1,7 @@
 # PS2 模型构建通用说明（给建模 agent）
 
 ## 环境
-- 仓库：`/Users/owwwwwen/Developer/GameDuo`，分支 `ps2-models`。**不要运行 git**，由协调者提交。
+- 仓库：GameDuo 仓库根目录（下文所有路径都相对仓库根目录，命令也从仓库根目录运行），分支 `ps2-models`。**不要运行 git**，由协调者提交。
 - 其他 agent 同时在建别的模型，只改你任务里列出的文件。
 - M2 只有 8 GB 内存：Blender 一律后台运行 `-b`，渲染用低采样，不要同时开多个 Blender。
 - Blender：`B="/Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python-exit-code 1"`，运行 `$B --python <script.py>`（从仓库根目录）。

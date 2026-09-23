@@ -58,7 +58,7 @@
 | memcard_top_forenti.jpg | https://commons.wikimedia.org/wiki/File:PS2_Memory_Card.jpg | Forenti / CC BY-SA 3.0 |
 | memcard_top_ilion.jpg | https://commons.wikimedia.org/wiki/File:Sony_PS2_Speicherkarte.jpg | Ilion / CC BY-SA 3.0 |
 
-另外也用到了仓库里已有的 `PS2_Model/references/memcard_8mb_evanamos.jpg`（Evan-Amos，公有领域）和 `memcard_scph10020_solomon203.jpg`（Solomon203，CC BY-SA 4.0）。社区 CAD 文件只下载到临时目录读取数值，没有放进仓库。
+另外也用到了仓库里已有的 `PS2_Model/references/memcard_8mb_evanamos.jpg`（Evan-Amos，公有领域，https://commons.wikimedia.org/wiki/File:PS2-8MB-Mem-Card.jpg ）和 `memcard_scph10020_solomon203.jpg`（Solomon203，CC BY-SA 4.0，https://commons.wikimedia.org/wiki/File:SCPH-10020_Memory_Card.jpg ）。社区 CAD 文件只下载到临时目录读取数值，没有放进仓库。
 
 ## 精度边界
 宽 42 和厚 7.5 来自两个互相独立的社区 CAD，彼此一致，误差约 ±0.3（厚度另一个值是 7.3）。长 56.5 来自三张照片的长宽比，三者只差 1%，但一张有透视的照片（solomon203）给出的比例更低，所以长度按 ±1 mm 看待。印字位置大约 ±0.5 mm。接口窗口的尺寸、隔筋位置和防呆方向只有一个爱好者复刻外壳作依据，属于推定；如果要和主机插槽精确配合，需要实物测量或参考插槽开口的数据。Sony 说明书里没有外形尺寸。

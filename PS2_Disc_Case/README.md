@@ -7,7 +7,7 @@ PS2 DVD-ROM 游戏光盘（NTSC-U/C，120 mm 单面）和美版黑色 Amaray PS2
 - `exports/PS2-DVD.usdz`、`exports/PS2-Case.usdz`：运行时资产。已按 `PS2-DVD.usdz`、`PS2-Case.usdz` 复制到 `DuoDS/Resources/`，**尚未加入 Xcode target**，接入时需手动添加。
 - `PS2_Disc_Case.blend`：由 `build_case.py` 保存，盒子加上一张放在卡座上的光盘（光盘只在 `.blend` 里，不进盒子的 USDZ）。每次重建都会覆盖；要改请改脚本或契约。
 - `source/build_dvd.py`：光盘建模与导出，同时提供 `build_case.py` 复用的几何、文字、标志和渲染辅助函数。
-- `source/build_case.py`：光盘盒建模与导出，含铰链自检（四个开合姿态下托盘、书脊、盒盖之间无相交）。
+- `source/build_case.py`：光盘盒建模与导出，含自检：四个开合姿态下托盘、书脊、盒盖之间无相交；盒子关闭时 `CASE_DISC_ANCHOR` 上的光盘、记忆卡座里的 56.5 × 42 × 7.5 mm 代理卡都与盒子无相交。任一项失败则脚本退出码为 1。
 - `validation.json`：`tools/ps2_blender/validate_ps2.py` 写入的自动校验结果。
 - `renders/`：`dvd_label / dvd_data`（标签面、数据面），`case_closed / case_open`，以及 UV 验证图 `case_open_cover_outside / case_closed_cover`（用中性测试图检查三块封面网格共用一张图时是否连续，不是游戏封面）。
 - `references/`：参考照片，来源与许可见 REFERENCE_NOTES。
@@ -24,7 +24,7 @@ PS2 DVD-ROM 游戏光盘（NTSC-U/C，120 mm 单面）和美版黑色 Amaray PS2
 
 ## SceneKit 接入约定
 
-可动节点静止姿态为位置 0、旋转 0；表中的轴是该节点在父节点空间中的本地轴。USD 导入器会把带子节点的网格拆成 `NAME` 和几何子节点 `NAME_mesh`；这两个资产的可动节点和对位节点都是空节点，材质槽 `DISC_LABEL`、`COVER_ART*` 本身就带 geometry。
+这两个资产只有旋转运动（`CASE_SPINE`、`CASE_LID` 的 `rot_y`）：可动节点的静止旋转为 0，范围就是 `eulerAngles` 对应分量的绝对值；节点位置是铰链所在处（`CASE_LID` 静止在父空间 (0, 0, −14) mm），不是 0，运动时不要改写 `position`。表中的轴是该节点在父节点空间中的本地轴。（如果以后加入平移 `loc_*` 运动，其范围是相对静止位置的偏移：载入时保存 `restPosition = node.position`，再写 `position = restPosition + axis * value`，见 `../PS2_Model/README.md`。）USD 导入器会把带子节点的网格拆成 `NAME` 和几何子节点 `NAME_mesh`；这两个资产的可动节点和对位节点都是空节点，材质槽 `DISC_LABEL`、`COVER_ART*` 本身就带 geometry。
 
 ### 光盘 `PS2-DVD.usdz`
 
@@ -44,15 +44,15 @@ PS2 DVD-ROM 游戏光盘（NTSC-U/C，120 mm 单面）和美版黑色 Amaray PS2
 
 | 节点 | 作用 | 轴 / 范围 |
 |---|---|---|
-| `CASE_TRAY` | 静态后半：托盘壳、卡座（6 爪）、护盘弧墙、记忆卡座、透明膜、封底 | 静态 |
-| `CASE_DISC_ANCHOR` | 空节点，`CASE_TRAY` 子节点，位于 (−5, 71, −2.6) mm，已绕 X 转 +90°，使光盘 +Y（标签面）朝向盒盖 | 静止；`PS2_DVD` 以单位变换挂到这里即扣在卡座上 |
+| `CASE_TRAY` | 静态后半：托盘壳、卡座（6 爪）、护盘弧墙、记忆卡座（内框 57.0 × 42.5 mm，可放 56.5 × 42 的记忆卡，四周约 0.25 mm 余隙）、透明膜、封底 | 静态 |
+| `CASE_DISC_ANCHOR` | 空节点，`CASE_TRAY` 子节点，位于 (−5, 71, −2.6) mm，已绕 X 转 +90°，使光盘 +Y（标签面）朝向盒盖 | 静止；`PS2_DVD` 以单位变换挂到这里即扣在卡座上（卡座顶面和辐条比光盘数据面低 0.05 mm，自检确认盒子关闭时光盘与盒子无穿模） |
 | `CASE_SPINE_HINGE` | 空节点，位于后铰链线，绕 X 转 π（本地 +Y = 世界 −Y）；只是框架，不要动它 | 静态 |
 | `CASE_SPINE` | 书脊（后铰链） | 本地 Y 旋转，0（关闭）→ `π/2` |
 | `CASE_LID` | 盒盖，`CASE_SPINE` 的子节点，位于前铰链线（父空间 (0, 0, −14) mm） | 本地 Y 旋转，0（关闭）→ `π/2` |
 | `COVER_ART` | 封面材质槽（`CASE_LID` 下） | 见下文“封面贴图” |
 | `COVER_ART_SPINE` | 书脊封面材质槽（`CASE_SPINE` 下） | 同上 |
 | `COVER_ART_BACK` | 封底材质槽（`CASE_TRAY` 下） | 同上 |
-| `TRADEMARK_PRINTS` | 顶层商标组（根节点下，静态）：托盘底面记忆卡座旁的模压 PS 标志 `TRAY_PS_LOGO_EMBOSS`；跟随可动部件的印刷分在下面两个组里 | — |
+| `TRADEMARK_PRINTS` | 顶层商标组（根节点下，静态）：托盘底面记忆卡座旁的模压 PS 标志 `TRAY_PS_LOGO_EMBOSS`、托盘底面的模压 AMARAY 厂商标 `TRAY_AMARAY_EMBOSS`；跟随可动部件的印刷分在下面两个组里 | — |
 | `TRADEMARK_PRINTS_SPINE` | `CASE_SPINE` 下：书脊黑色横带、白框彩色 PS 标志、竖排 “PlayStation 2” 字标 | — |
 | `TRADEMARK_PRINTS_LID` | `CASE_LID` 下：封面顶部黑色横幅、白色 “PlayStation 2” 字标、彩色 PS 标志 | — |
 
@@ -96,7 +96,7 @@ PS2 DVD-ROM 游戏光盘（NTSC-U/C，120 mm 单面）和美版黑色 Amaray PS2
 | 光盘 | `TRADEMARK_PRINTS`（标签印刷与中心全息） |
 | 光盘盒 | `TRADEMARK_PRINTS`、`TRADEMARK_PRINTS_SPINE`、`TRADEMARK_PRINTS_LID`（三个一起隐藏） |
 
-隐藏这三个组即可去掉盒子上全部商标，包括托盘底面的模压 PS 标志（`TRAY_PS_LOGO_EMBOSS`，在 `TRADEMARK_PRINTS` 下）。`TRAY_EMBOSS` 里只剩非商标的模压（箭头、MEMORY CARD HOLDER、卡座按钮上的 PUSH、AMARAY），书脊内侧的专利号模压 `SPINE_EMBOSS` 也不是商标，都不需要隐藏。
+隐藏这三个组即可去掉盒子上全部商标，包括托盘底面的模压 PS 标志（`TRAY_PS_LOGO_EMBOSS`）和 AMARAY 厂商标（`TRAY_AMARAY_EMBOSS`，AMARAY 是注册商标），两者都在 `TRADEMARK_PRINTS` 下。`TRAY_EMBOSS` 里只剩非商标的模压（箭头、MEMORY CARD HOLDER、卡座按钮上的 PUSH），书脊内侧的专利号模压 `SPINE_EMBOSS` 也不是商标，都不需要隐藏。
 
 ## 尺寸与面数
 
