@@ -1,0 +1,541 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		D00520260921000000000003 /* Localizable in Resources */ = {isa = PBXBuildFile; fileRef = D00520260921000000000004; };
+		D00520260921000000000001 /* Assets in Resources */ = {isa = PBXBuildFile; fileRef = D00520260921000000000002; };
+		D0A1B2C3D4E5F60718293A51 /* Console-Studio.hdr in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF08; };
+		D0A1B2C3D4E5F60718293A50 /* Detailed-Cartridges.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF07; };
+		D0A1B2C3D4E5F60718293A54 /* Cartridge-Finger-Snap.wav in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF10; };
+		D0A1B2C3D4E5F60718293A55 /* PSP-UMD.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF11; };
+		D0A1B2C3D4E5F60718293A59 /* PSP-UMD-Shell.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF15; };
+		D0A1B2C3D4E5F60718293A56 /* PPSSPP in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF12; };
+		D0A1B2C3D4E5F60718293A57 /* PSP2000-UMD-Open-Transition.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF13; };
+		D0A1B2C3D4E5F60718293A58 /* PSP2000-Front.png in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF14; };
+		27ADD5341A92E91ED8F992D9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D12503635828B409311C67C /* ContentView.swift */; };
+		A3A3A3A30000000000000007 /* GameLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000018 /* GameLibrary.swift */; };
+		A3A3A3A30000000000000008 /* CartridgeInsertionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000019 /* CartridgeInsertionView.swift */; };
+		2E833945F40D20822044DFFB /* ZIPFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 56AB9BAF8ED5C4981A1C6C15 /* ZIPFoundation.framework */; };
+		2F4FB849EF689B8143217505 /* MelonDSDeltaCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 6378DF3DD4AE97CCDD36FD9C /* MelonDSDeltaCore.framework */; };
+		30E95276221DFB79C04AF86F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0062BF117B28CA5FC457EAC9 /* Foundation.framework */; };
+		825DE0DA39CE14491602441A /* EmulatorSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8AB6A83302A72A024407F5 /* EmulatorSession.swift */; };
+		D0BEEF000000000000000002 /* DuoPro.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0BEEF000000000000000001 /* DuoPro.swift */; };
+		8B8725291399B3A383B91F84 /* DeltaCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 451325081BE0C0B403F2BE9D /* DeltaCore.framework */; };
+		99935F4B632F63796F747C94 /* MelonDSDeltaCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6378DF3DD4AE97CCDD36FD9C /* MelonDSDeltaCore.framework */; };
+		BA916DE8BA15C814204C00FA /* ZIPFoundation.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 56AB9BAF8ED5C4981A1C6C15 /* ZIPFoundation.framework */; };
+		BD2FC4D5F2BE0CFBC49860D5 /* DuoDSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B81AC279A8C037D0ADEEB9 /* DuoDSApp.swift */; };
+		A3A3A3A30000000000000001 /* AzaharCoreBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000011 /* AzaharCoreBridge.mm */; };
+		A3A3A3A30000000000000002 /* AzaharAudioOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000012 /* AzaharAudioOutput.swift */; };
+		A3A3A3A30000000000000003 /* AzaharCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000015 /* AzaharCore.xcframework */; };
+		A3A3A3A30000000000000004 /* AzaharCore.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000015 /* AzaharCore.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F472120A2A82D2561EDA36DB /* DeltaCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 451325081BE0C0B403F2BE9D /* DeltaCore.framework */; };
+		D0A1B2C3D4E5F60718293A4B /* FuzedNeo.nds in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF02 /* FuzedNeo.nds */; };
+		D0A1B2C3D4E5F60718293A52 /* TrailMix.nds in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF09 /* TrailMix.nds */; };
+		D0A1B2C3D4E5F60718293A4C /* Nintendo-3DS-XL-180deg.png in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF03 /* Nintendo-3DS-XL-180deg.png */; };
+		D0A1B2C3D4E5F60718293A4F /* 3DSXL-Cartridge-Open-Transition.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF06 /* 3DSXL-Cartridge-Open-Transition.usdz */; };
+		D0A1B2C3D4E5F60718293A4D /* Controls in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF04 /* Controls */; };
+		A3A3A3A30000000000000005 /* Mars3D.3dsx in Resources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000016 /* Mars3D.3dsx */; };
+		A3A3A3A30000000000000006 /* HomebrewMenu.3dsx in Resources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000017 /* HomebrewMenu.3dsx */; };
+		D0A1B2C3D4E5F60718293A53 /* MK64-3DS.3dsx in Resources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000020 /* MK64-3DS.3dsx */; };
+		D00D20000000000000000200 /* ROMArchive.mm in Sources */ = {isa = PBXBuildFile; fileRef = D00D20000000000000000100; };
+		D00D20000000000000000201 /* ROMFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00D20000000000000000101; };
+		D00D20000000000000000401 = {isa = PBXBuildFile; fileRef = D00D20000000000000000400; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D00D20000000000000000501 = {isa = PBXBuildFile; fileRef = D00D20000000000000000500; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D00D20000000000000000601 /* PPSSPPCore.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D00D20000000000000000600 /* PPSSPPCore.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D00D20000000000000000203 = {isa = PBXBuildFile; fileRef = D00D20000000000000000103; };
+		D35E00000000000000000002 /* DeSmuMECore.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D35E00000000000000000000 /* DeSmuMECore.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		56E8EFE25AFE86325EF8A2C9 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				A3A3A3A30000000000000004 /* AzaharCore.xcframework in Embed Frameworks */,
+				D35E00000000000000000002 /* DeSmuMECore.xcframework in Embed Frameworks */,
+				D00D20000000000000000401,
+				D00D20000000000000000501,
+				D00D20000000000000000601 /* PPSSPPCore.xcframework in Embed Frameworks */,
+				2F4FB849EF689B8143217505 /* MelonDSDeltaCore.framework in Embed Frameworks */,
+				8B8725291399B3A383B91F84 /* DeltaCore.framework in Embed Frameworks */,
+				BA916DE8BA15C814204C00FA /* ZIPFoundation.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		D00520260921000000000004 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = DuoDS/Resources/Localizable.xcstrings; sourceTree = SOURCE_ROOT; };
+		D00520260921000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = DuoDS/Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		C0FFEE1234567890ABCDEF08 /* Console-Studio.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Console-Studio.hdr"; sourceTree = "<group>"; };
+		C0FFEE1234567890ABCDEF07 /* Detailed-Cartridges.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = "Resources/Detailed-Cartridges.usdz"; sourceTree = "<group>"; };
+		C0FFEE1234567890ABCDEF10 /* Cartridge-Finger-Snap.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = "Cartridge-Finger-Snap.wav"; path = "Resources/Audio/Cartridge-Finger-Snap.wav"; sourceTree = "<group>"; };
+		C0FFEE1234567890ABCDEF11 /* PSP-UMD.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = "DuoDS/Resources/PSP-UMD.usdz"; sourceTree = SOURCE_ROOT; };
+		C0FFEE1234567890ABCDEF15 /* PSP-UMD-Shell.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = "DuoDS/Resources/PSP-UMD-Shell.usdz"; sourceTree = SOURCE_ROOT; };
+		C0FFEE1234567890ABCDEF12 /* PPSSPP */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "DuoDS/Resources/PPSSPP"; sourceTree = SOURCE_ROOT; };
+		C0FFEE1234567890ABCDEF13 /* PSP2000-UMD-Open-Transition.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = "DuoDS/Resources/PSP2000-UMD-Open-Transition.usdz"; sourceTree = SOURCE_ROOT; };
+		C0FFEE1234567890ABCDEF14 /* PSP2000-Front.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "DuoDS/Resources/PSP2000-Front.png"; sourceTree = SOURCE_ROOT; };
+		0062BF117B28CA5FC457EAC9 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		3D12503635828B409311C67C /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A3A3A3A30000000000000018 /* GameLibrary.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GameLibrary.swift; path = GameLibrary.swift; sourceTree = "<group>"; };
+		A3A3A3A30000000000000019 /* CartridgeInsertionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CartridgeInsertionView.swift; path = CartridgeInsertionView.swift; sourceTree = "<group>"; };
+		451325081BE0C0B403F2BE9D /* DeltaCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = DeltaCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		56AB9BAF8ED5C4981A1C6C15 /* ZIPFoundation.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = ZIPFoundation.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		5C8AB6A83302A72A024407F5 /* EmulatorSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EmulatorSession.swift; path = EmulatorSession.swift; sourceTree = "<group>"; };
+		D0BEEF000000000000000001 /* DuoPro.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DuoPro.swift; path = DuoPro.swift; sourceTree = "<group>"; };
+		D0BEEF000000000000000003 /* DuoDS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = DuoDS.entitlements; path = DuoDS.entitlements; sourceTree = "<group>"; };
+		6378DF3DD4AE97CCDD36FD9C /* MelonDSDeltaCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = MelonDSDeltaCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		67B81AC279A8C037D0ADEEB9 /* DuoDSApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DuoDSApp.swift; path = DuoDSApp.swift; sourceTree = "<group>"; };
+		A3A3A3A30000000000000011 /* AzaharCoreBridge.mm */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.cpp.objcpp; name = AzaharCoreBridge.mm; path = AzaharCoreBridge.mm; sourceTree = "<group>"; };
+		A3A3A3A30000000000000012 /* AzaharAudioOutput.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AzaharAudioOutput.swift; path = AzaharAudioOutput.swift; sourceTree = "<group>"; };
+		A3A3A3A30000000000000013 /* AzaharCoreBridge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = AzaharCoreBridge.h; path = AzaharCoreBridge.h; sourceTree = "<group>"; };
+		A3A3A3A30000000000000014 /* DuoDS-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = "DuoDS-Bridging-Header.h"; path = "DuoDS-Bridging-Header.h"; sourceTree = "<group>"; };
+		A3A3A3A30000000000000015 /* AzaharCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = AzaharCore.xcframework; path = ThirdParty/StoreCores/AzaharCore.xcframework; sourceTree = SOURCE_ROOT; };
+		6ADAAD8F99C77C01545AF9D1 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = Info.plist; sourceTree = "<group>"; };
+		C0FFEE1234567890ABCDEF02 /* FuzedNeo.nds */ = {isa = PBXFileReference; lastKnownFileType = file; name = FuzedNeo.nds; path = FuzedNeo.nds; sourceTree = "<group>"; };
+		C0FFEE1234567890ABCDEF09 /* TrailMix.nds */ = {isa = PBXFileReference; lastKnownFileType = file; name = TrailMix.nds; path = TrailMix.nds; sourceTree = "<group>"; };
+		C0FFEE1234567890ABCDEF03 /* Nintendo-3DS-XL-180deg.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Nintendo-3DS-XL-180deg.png"; path = "DuoDS/Resources/Nintendo-3DS-XL-180deg.png"; sourceTree = SOURCE_ROOT; };
+		C0FFEE1234567890ABCDEF06 /* 3DSXL-Cartridge-Open-Transition.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; name = "3DSXL-Cartridge-Open-Transition.usdz"; path = "Resources/3DSXL-Cartridge-Open-Transition.usdz"; sourceTree = "<group>"; };
+		C0FFEE1234567890ABCDEF04 /* Controls */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Controls; path = Resources/Controls; sourceTree = "<group>"; };
+		A3A3A3A30000000000000016 /* Mars3D.3dsx */ = {isa = PBXFileReference; lastKnownFileType = file; name = Mars3D.3dsx; path = 3DS/Mars3D.3dsx; sourceTree = "<group>"; };
+		A3A3A3A30000000000000017 /* HomebrewMenu.3dsx */ = {isa = PBXFileReference; lastKnownFileType = file; name = HomebrewMenu.3dsx; path = 3DS/HomebrewMenu.3dsx; sourceTree = "<group>"; };
+		A3A3A3A30000000000000020 /* MK64-3DS.3dsx */ = {isa = PBXFileReference; lastKnownFileType = file; name = "MK64-3DS.3dsx"; path = "MK64-3DS.3dsx"; sourceTree = "<group>"; };
+		E2C85106F30E804478266C51 /* DuoDS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DuoDS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D00D20000000000000000100 /* ROMArchive.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ROMArchive.mm; sourceTree = "<group>"; };
+		D00D20000000000000000101 /* ROMFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROMFiles.swift; sourceTree = "<group>"; };
+		D00D20000000000000000400 = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = ThirdParty/StoreCores/N64Core.xcframework; sourceTree = SOURCE_ROOT; };
+		D00D20000000000000000500 = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = ThirdParty/StoreCores/MelonDSCore.xcframework; sourceTree = SOURCE_ROOT; };
+		D00D20000000000000000600 /* PPSSPPCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = ThirdParty/StoreCores/PPSSPPCore.xcframework; sourceTree = SOURCE_ROOT; };
+		D35E00000000000000000000 /* DeSmuMECore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = ThirdParty/StoreCores/DeSmuMECore.xcframework; sourceTree = SOURCE_ROOT; };
+D00D20000000000000000103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROMValidation.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C383408BFBDD8A180059B3BB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3A3A3A30000000000000003 /* AzaharCore.xcframework in Frameworks */,
+				30E95276221DFB79C04AF86F /* Foundation.framework in Frameworks */,
+				99935F4B632F63796F747C94 /* MelonDSDeltaCore.framework in Frameworks */,
+				F472120A2A82D2561EDA36DB /* DeltaCore.framework in Frameworks */,
+				2E833945F40D20822044DFFB /* ZIPFoundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		258807CA72E5787E13032DC8 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				DF64303DAA524AC3CFCEAC44 /* iOS */,
+				D35E00000000000000000000 /* DeSmuMECore.xcframework */,
+				A3A3A3A30000000000000015 /* AzaharCore.xcframework */,
+				D00D20000000000000000400,
+				D00D20000000000000000500,
+				D00D20000000000000000600 /* PPSSPPCore.xcframework */,
+				6378DF3DD4AE97CCDD36FD9C /* MelonDSDeltaCore.framework */,
+				451325081BE0C0B403F2BE9D /* DeltaCore.framework */,
+				56AB9BAF8ED5C4981A1C6C15 /* ZIPFoundation.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8CE8D210C4D5129301C24313 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E2C85106F30E804478266C51 /* DuoDS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A07EA5BB3E8D4168D9538D8E /* App */ = {
+			isa = PBXGroup;
+			children = (
+				67B81AC279A8C037D0ADEEB9 /* DuoDSApp.swift */,
+				5C8AB6A83302A72A024407F5 /* EmulatorSession.swift */,
+				D0BEEF000000000000000001 /* DuoPro.swift */,
+				D0BEEF000000000000000003 /* DuoDS.entitlements */,
+				3D12503635828B409311C67C /* ContentView.swift */,
+				A3A3A3A30000000000000018 /* GameLibrary.swift */,
+				A3A3A3A30000000000000019 /* CartridgeInsertionView.swift */,
+				A3A3A3A30000000000000012 /* AzaharAudioOutput.swift */,
+				A3A3A3A30000000000000013 /* AzaharCoreBridge.h */,
+				A3A3A3A30000000000000011 /* AzaharCoreBridge.mm */,
+D00D20000000000000000103,
+				D00D20000000000000000101,
+				D00D20000000000000000100,
+				A3A3A3A30000000000000014 /* DuoDS-Bridging-Header.h */,
+				6ADAAD8F99C77C01545AF9D1 /* Info.plist */,
+			);
+			name = App;
+			path = App;
+			sourceTree = "<group>";
+		};
+		B1D38CBCF2C90409A40FAD03 /* DuoDS */ = {
+			isa = PBXGroup;
+			children = (
+				A07EA5BB3E8D4168D9538D8E /* App */,
+				C0FFEE1234567890ABCDEF03 /* Nintendo-3DS-XL-180deg.png */,
+				C0FFEE1234567890ABCDEF06 /* 3DSXL-Cartridge-Open-Transition.usdz */,
+				C0FFEE1234567890ABCDEF07 /* Detailed-Cartridges.usdz */,
+				C0FFEE1234567890ABCDEF08 /* Console-Studio.hdr */,
+				C0FFEE1234567890ABCDEF04 /* Controls */,
+				C0FFEE1234567890ABCDEF10 /* Cartridge-Finger-Snap.wav */,
+				C0FFEE1234567890ABCDEF13 /* PSP2000-UMD-Open-Transition.usdz */,
+				C0FFEE1234567890ABCDEF14 /* PSP2000-Front.png */,
+				C0FFEE1234567890ABCDEF15 /* PSP-UMD-Shell.usdz */,
+			);
+			name = DuoDS;
+			path = DuoDS;
+			sourceTree = "<group>";
+		};
+		C0A1B2C3D4E5F60718293A4B /* TestFixtures */ = {
+			isa = PBXGroup;
+			children = (
+				C0FFEE1234567890ABCDEF02 /* FuzedNeo.nds */,
+				C0FFEE1234567890ABCDEF09 /* TrailMix.nds */,
+				A3A3A3A30000000000000016 /* Mars3D.3dsx */,
+				A3A3A3A30000000000000017 /* HomebrewMenu.3dsx */,
+				A3A3A3A30000000000000020 /* MK64-3DS.3dsx */,
+			);
+			name = TestFixtures;
+			path = TestFixtures;
+			sourceTree = "<group>";
+		};
+		DF64303DAA524AC3CFCEAC44 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				0062BF117B28CA5FC457EAC9 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		E68159307B1DAD728EA90A7F = {
+			isa = PBXGroup;
+			children = (
+				8CE8D210C4D5129301C24313 /* Products */,
+				258807CA72E5787E13032DC8 /* Frameworks */,
+				B1D38CBCF2C90409A40FAD03 /* DuoDS */,
+				C0A1B2C3D4E5F60718293A4B /* TestFixtures */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		91E92D734DDE964EDC083003 /* DuoDS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0ADC3CF6C37DA129CB8400BB /* Build configuration list for PBXNativeTarget "DuoDS" */;
+			buildPhases = (
+				9641CAD7CF47134C61244116 /* Sources */,
+				C383408BFBDD8A180059B3BB /* Frameworks */,
+				5B113ECC1E62ADB5C3695551 /* Resources */,
+				56E8EFE25AFE86325EF8A2C9 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DuoDS;
+			productName = DuoDS;
+			productReference = E2C85106F30E804478266C51 /* DuoDS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		87977D6E32B6DB3245FB6342 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 2710;
+			};
+			buildConfigurationList = D044FC7213CF95304D909A3C /* Build configuration list for PBXProject "DuoDS" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				"zh-Hans",
+				"zh-Hant",
+				Base,
+			);
+			mainGroup = E68159307B1DAD728EA90A7F;
+			minimizedProjectReferenceProxies = 0;
+			preferredProjectObjectVersion = 100;
+			productRefGroup = 8CE8D210C4D5129301C24313 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				91E92D734DDE964EDC083003 /* DuoDS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5B113ECC1E62ADB5C3695551 /* Resources */ = {
+		isa = PBXResourcesBuildPhase;
+		buildActionMask = 2147483647;
+		files = (
+			D00520260921000000000001,
+			D00520260921000000000003,
+			D0A1B2C3D4E5F60718293A4B /* FuzedNeo.nds in Resources */,
+			D0A1B2C3D4E5F60718293A52 /* TrailMix.nds in Resources */,
+			A3A3A3A30000000000000005 /* Mars3D.3dsx in Resources */,
+			A3A3A3A30000000000000006 /* HomebrewMenu.3dsx in Resources */,
+			D0A1B2C3D4E5F60718293A53 /* MK64-3DS.3dsx in Resources */,
+			D0A1B2C3D4E5F60718293A4C /* Nintendo-3DS-XL-180deg.png in Resources */,
+			D0A1B2C3D4E5F60718293A4F /* 3DSXL-Cartridge-Open-Transition.usdz in Resources */,
+			D0A1B2C3D4E5F60718293A50 /* Detailed-Cartridges.usdz in Resources */,
+			D0A1B2C3D4E5F60718293A51 /* Console-Studio.hdr in Resources */,
+			D0A1B2C3D4E5F60718293A4D /* Controls in Resources */,
+			D0A1B2C3D4E5F60718293A54 /* Cartridge-Finger-Snap.wav in Resources */,
+			D0A1B2C3D4E5F60718293A55 /* PSP-UMD.usdz in Resources */,
+			D0A1B2C3D4E5F60718293A59 /* PSP-UMD-Shell.usdz in Resources */,
+			D0A1B2C3D4E5F60718293A56 /* PPSSPP in Resources */,
+			D0A1B2C3D4E5F60718293A57 /* PSP2000-UMD-Open-Transition.usdz in Resources */,
+			D0A1B2C3D4E5F60718293A58 /* PSP2000-Front.png in Resources */,
+		);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9641CAD7CF47134C61244116 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BD2FC4D5F2BE0CFBC49860D5 /* DuoDSApp.swift in Sources */,
+				825DE0DA39CE14491602441A /* EmulatorSession.swift in Sources */,
+				D0BEEF000000000000000002 /* DuoPro.swift in Sources */,
+				27ADD5341A92E91ED8F992D9 /* ContentView.swift in Sources */,
+				A3A3A3A30000000000000007 /* GameLibrary.swift in Sources */,
+				A3A3A3A30000000000000008 /* CartridgeInsertionView.swift in Sources */,
+				A3A3A3A30000000000000001 /* AzaharCoreBridge.mm in Sources */,
+D00D20000000000000000203,
+				D00D20000000000000000201,
+				D00D20000000000000000200,
+				A3A3A3A30000000000000002 /* AzaharAudioOutput.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1E90DE5071F362A67FD63BC1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APP_DISPLAY_NAME = "Game Duo";
+				EXCLUDED_SOURCE_FILE_NAMES = "FuzedNeo.nds TrailMix.nds Mars3D.3dsx HomebrewMenu.3dsx MK64-3DS.3dsx";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+					CLANG_ENABLE_OBJC_WEAK = NO;
+					CODE_SIGN_ENTITLEMENTS = DuoDS/App/DuoDS.entitlements;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				DEVELOPMENT_TEAM = AHVDBX7277;
+				PROVISIONING_PROFILE_SPECIFIER = "Game Duo App Store";
+				INFOPLIST_FILE = DuoDS/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				OTHER_LDFLAGS = (
+                    "-larchive",
+					"$(inherited)",
+					"-framework",
+					MelonDSDeltaCore,
+					"-framework",
+					DeltaCore,
+					"-framework",
+					ZIPFoundation,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.duods.app;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				SWIFT_OBJC_BRIDGING_HEADER = "DuoDS/App/DuoDS-Bridging-Header.h";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		2E2A3DA0BD6E81BACBF6FE6B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				SWIFT_OBJC_BRIDGING_HEADER = "DuoDS/App/DuoDS-Bridging-Header.h";
+			};
+			name = Release;
+		};
+		3B009A928AB3FC8E9A4BF2BF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APP_DISPLAY_NAME = "Game Duo";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+					CLANG_ENABLE_OBJC_WEAK = NO;
+					CODE_SIGN_ENTITLEMENTS = DuoDS/App/DuoDS.entitlements;
+				CODE_SIGNING_ALLOWED = NO;
+				INFOPLIST_FILE = DuoDS/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				OTHER_LDFLAGS = (
+                    "-larchive",
+					"$(inherited)",
+					"-framework",
+					MelonDSDeltaCore,
+					"-framework",
+					DeltaCore,
+					"-framework",
+					ZIPFoundation,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.duods.app;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				SWIFT_OBJC_BRIDGING_HEADER = "DuoDS/App/DuoDS-Bridging-Header.h";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A843FF3CE50649B0EE947125 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0ADC3CF6C37DA129CB8400BB /* Build configuration list for PBXNativeTarget "DuoDS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1E90DE5071F362A67FD63BC1 /* Release */,
+				3B009A928AB3FC8E9A4BF2BF /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D044FC7213CF95304D909A3C /* Build configuration list for PBXProject "DuoDS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A843FF3CE50649B0EE947125 /* Debug */,
+				2E2A3DA0BD6E81BACBF6FE6B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 87977D6E32B6DB3245FB6342 /* Project object */;
+}

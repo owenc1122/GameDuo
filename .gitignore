@@ -1,0 +1,10 @@
+/*
+!/DuoDS/
+!/DuoDS.xcodeproj/
+!/DuoDS.xcworkspace/
+!/tools/
+!/DEPENDENCIES.md
+!/AGENTS.md
+!/.gitignore
+.DS_Store
+xcuserdata/

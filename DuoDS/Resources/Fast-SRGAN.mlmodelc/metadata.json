@@ -1,0 +1,75 @@
+[
+  {
+    "metadataOutputVersion" : "3.0",
+    "shortDescription" : "Fast-SRGAN. Converted by https:\/\/github.com\/john-rocky\/CoreML-Models",
+    "outputSchema" : [
+      {
+        "height" : "1024",
+        "colorspace" : "RGB",
+        "isOptional" : "0",
+        "width" : "1024",
+        "isColor" : "1",
+        "formattedType" : "Image (Color 1024 × 1024)",
+        "hasSizeFlexibility" : "0",
+        "type" : "Image",
+        "shortDescription" : "Output image",
+        "name" : "activation_out"
+      }
+    ],
+    "storagePrecision" : "Float32",
+    "modelParameters" : [
+
+    ],
+    "author" : "https:\/\/github.com\/DingXiaoH\/RepVGG",
+    "specificationVersion" : 4,
+    "license" : "MIT License",
+    "computePrecision" : "Float16",
+    "stateSchema" : [
+
+    ],
+    "isUpdatable" : "0",
+    "availability" : {
+      "macOS" : "10.15",
+      "tvOS" : "13.0",
+      "visionOS" : "1.0",
+      "watchOS" : "6.0",
+      "iOS" : "13.0",
+      "macCatalyst" : "13.0"
+    },
+    "modelType" : {
+      "name" : "MLModelType_neuralNetwork"
+    },
+    "inputSchema" : [
+      {
+        "height" : "256",
+        "colorspace" : "RGB",
+        "isOptional" : "0",
+        "width" : "256",
+        "isColor" : "1",
+        "formattedType" : "Image (Color 256 × 256)",
+        "hasSizeFlexibility" : "0",
+        "type" : "Image",
+        "shortDescription" : "Input image",
+        "name" : "input_3"
+      }
+    ],
+    "userDefinedMetadata" : {
+      "com.github.apple.coremltools.version" : "5.1.0",
+      "com.github.apple.coremltools.source" : "tensorflow==2.7.0"
+    },
+    "generatedClassName" : "Fast_SRGAN",
+    "neuralNetworkLayerTypeHistogram" : {
+      "ReorganizeDataDepthToSpace" : 2,
+      "Multiply" : 6,
+      "ActivationReLU" : 17,
+      "ActivationLinear" : 1,
+      "Transpose" : 1,
+      "Add" : 10,
+      "LoadConstantND" : 3,
+      "ActivationTanh" : 1,
+      "Convolution" : 22,
+      "Permute" : 1
+    },
+    "method" : "predict"
+  }
+]

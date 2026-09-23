@@ -1,0 +1,1085 @@
+{
+  "layers" : [
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/batch_normalization_7\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/batch_normalization_7\/FusedBatchNormV3_nchw",
+      "blob_weights" : 3,
+      "K" : 3,
+      "blob_biases" : 1,
+      "name" : "model_2\/batch_normalization_7\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 32,
+      "bottom" : "input_3",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "bottom" : "model_2\/batch_normalization_7\/FusedBatchNormV3_nchw",
+      "weights" : {
+
+      },
+      "mode" : 0,
+      "debug_info" : "model_2\/p_re_lu\/Relu",
+      "top" : "model_2\/p_re_lu\/Relu",
+      "type" : "activation",
+      "name" : "model_2\/p_re_lu\/Relu"
+    },
+    {
+      "bottom" : "model_2\/batch_normalization_7\/FusedBatchNormV3_nchw",
+      "alpha" : -1,
+      "operation" : 1,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/p_re_lu\/Neg_1",
+      "top" : "model_2\/p_re_lu\/Neg_1",
+      "type" : "elementwise",
+      "name" : "model_2\/p_re_lu\/Neg_1",
+      "beta" : 0
+    },
+    {
+      "bottom" : "model_2\/p_re_lu\/Neg_1",
+      "weights" : {
+
+      },
+      "mode" : 0,
+      "debug_info" : "model_2\/p_re_lu\/Relu_1",
+      "top" : "model_2\/p_re_lu\/Relu_1",
+      "type" : "activation",
+      "name" : "model_2\/p_re_lu\/Relu_1"
+    },
+    {
+      "top" : "const_1",
+      "w" : 1,
+      "h" : 1,
+      "name" : "const_1",
+      "nd_rank" : 4,
+      "type" : "load_constant",
+      "k" : 32,
+      "bottom" : "",
+      "debug_info" : "const_1",
+      "n" : 1,
+      "weights" : {
+
+      },
+      "constant_blob" : 5
+    },
+    {
+      "bottom" : "model_2\/p_re_lu\/Relu_1,const_1",
+      "alpha" : 1,
+      "operation" : 1,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/p_re_lu\/mul",
+      "top" : "model_2\/p_re_lu\/mul",
+      "type" : "elementwise",
+      "name" : "model_2\/p_re_lu\/mul",
+      "beta" : 0
+    },
+    {
+      "bottom" : "model_2\/p_re_lu\/Relu,model_2\/p_re_lu\/mul",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/p_re_lu\/add",
+      "top" : "model_2\/p_re_lu\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/p_re_lu\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/expanded_conv_depthwise_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/expanded_conv_depthwise_relu\/Relu",
+      "blob_weights" : 9,
+      "K" : 32,
+      "blob_biases" : 7,
+      "name" : "model_2\/expanded_conv_depthwise_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 32,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 32,
+      "bottom" : "model_2\/p_re_lu\/add",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/expanded_conv_project_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/expanded_conv_project_BN\/FusedBatchNormV3_nchw",
+      "blob_weights" : 13,
+      "K" : 32,
+      "blob_biases" : 11,
+      "name" : "model_2\/expanded_conv_project_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 32,
+      "bottom" : "model_2\/expanded_conv_depthwise_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "bottom" : "model_2\/p_re_lu\/add,model_2\/expanded_conv_project_BN\/FusedBatchNormV3_nchw",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/expanded_conv_add\/add",
+      "top" : "model_2\/expanded_conv_add\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/expanded_conv_add\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_1_expand_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_1_expand_relu\/Relu",
+      "blob_weights" : 17,
+      "K" : 32,
+      "blob_biases" : 15,
+      "name" : "model_2\/block_1_expand_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/expanded_conv_add\/add",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_1_depthwise_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_1_depthwise_relu\/Relu",
+      "blob_weights" : 21,
+      "K" : 192,
+      "blob_biases" : 19,
+      "name" : "model_2\/block_1_depthwise_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 192,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/block_1_expand_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_1_project_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_1_project_BN\/FusedBatchNormV3_nchw",
+      "blob_weights" : 25,
+      "K" : 192,
+      "blob_biases" : 23,
+      "name" : "model_2\/block_1_project_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 32,
+      "bottom" : "model_2\/block_1_depthwise_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "bottom" : "model_2\/expanded_conv_add\/add,model_2\/block_1_project_BN\/FusedBatchNormV3_nchw",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/block_1_add\/add",
+      "top" : "model_2\/block_1_add\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/block_1_add\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_2_expand_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_2_expand_relu\/Relu",
+      "blob_weights" : 29,
+      "K" : 32,
+      "blob_biases" : 27,
+      "name" : "model_2\/block_2_expand_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/block_1_add\/add",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_2_depthwise_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_2_depthwise_relu\/Relu",
+      "blob_weights" : 33,
+      "K" : 192,
+      "blob_biases" : 31,
+      "name" : "model_2\/block_2_depthwise_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 192,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/block_2_expand_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_2_project_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_2_project_BN\/FusedBatchNormV3_nchw",
+      "blob_weights" : 37,
+      "K" : 192,
+      "blob_biases" : 35,
+      "name" : "model_2\/block_2_project_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 32,
+      "bottom" : "model_2\/block_2_depthwise_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "bottom" : "model_2\/block_1_add\/add,model_2\/block_2_project_BN\/FusedBatchNormV3_nchw",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/block_2_add\/add",
+      "top" : "model_2\/block_2_add\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/block_2_add\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_3_expand_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_3_expand_relu\/Relu",
+      "blob_weights" : 41,
+      "K" : 32,
+      "blob_biases" : 39,
+      "name" : "model_2\/block_3_expand_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/block_2_add\/add",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_3_depthwise_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_3_depthwise_relu\/Relu",
+      "blob_weights" : 45,
+      "K" : 192,
+      "blob_biases" : 43,
+      "name" : "model_2\/block_3_depthwise_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 192,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/block_3_expand_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_3_project_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_3_project_BN\/FusedBatchNormV3_nchw",
+      "blob_weights" : 49,
+      "K" : 192,
+      "blob_biases" : 47,
+      "name" : "model_2\/block_3_project_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 32,
+      "bottom" : "model_2\/block_3_depthwise_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "bottom" : "model_2\/block_2_add\/add,model_2\/block_3_project_BN\/FusedBatchNormV3_nchw",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/block_3_add\/add",
+      "top" : "model_2\/block_3_add\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/block_3_add\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_4_expand_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_4_expand_relu\/Relu",
+      "blob_weights" : 53,
+      "K" : 32,
+      "blob_biases" : 51,
+      "name" : "model_2\/block_4_expand_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/block_3_add\/add",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_4_depthwise_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_4_depthwise_relu\/Relu",
+      "blob_weights" : 57,
+      "K" : 192,
+      "blob_biases" : 55,
+      "name" : "model_2\/block_4_depthwise_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 192,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/block_4_expand_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_4_project_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_4_project_BN\/FusedBatchNormV3_nchw",
+      "blob_weights" : 61,
+      "K" : 192,
+      "blob_biases" : 59,
+      "name" : "model_2\/block_4_project_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 32,
+      "bottom" : "model_2\/block_4_depthwise_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "bottom" : "model_2\/block_3_add\/add,model_2\/block_4_project_BN\/FusedBatchNormV3_nchw",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/block_4_add\/add",
+      "top" : "model_2\/block_4_add\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/block_4_add\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_5_expand_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_5_expand_relu\/Relu",
+      "blob_weights" : 65,
+      "K" : 32,
+      "blob_biases" : 63,
+      "name" : "model_2\/block_5_expand_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/block_4_add\/add",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_5_depthwise_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_5_depthwise_relu\/Relu",
+      "blob_weights" : 69,
+      "K" : 192,
+      "blob_biases" : 67,
+      "name" : "model_2\/block_5_depthwise_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 192,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 192,
+      "bottom" : "model_2\/block_5_expand_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/block_5_project_BN\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/block_5_project_BN\/FusedBatchNormV3_nchw",
+      "blob_weights" : 73,
+      "K" : 192,
+      "blob_biases" : 71,
+      "name" : "model_2\/block_5_project_BN\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 32,
+      "bottom" : "model_2\/block_5_depthwise_relu\/Relu",
+      "weights" : {
+
+      },
+      "Nx" : 1,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 1,
+      "n_parallel" : 1
+    },
+    {
+      "bottom" : "model_2\/block_4_add\/add,model_2\/block_5_project_BN\/FusedBatchNormV3_nchw",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/block_5_add\/add",
+      "top" : "model_2\/block_5_add\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/block_5_add\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/batch_normalization_8\/FusedBatchNormV3_nchw",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/batch_normalization_8\/FusedBatchNormV3_nchw",
+      "blob_weights" : 77,
+      "K" : 32,
+      "blob_biases" : 75,
+      "name" : "model_2\/batch_normalization_8\/FusedBatchNormV3_nchw",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 32,
+      "bottom" : "model_2\/block_5_add\/add",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "bottom" : "model_2\/batch_normalization_8\/FusedBatchNormV3_nchw,model_2\/p_re_lu\/add",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/add\/add",
+      "top" : "model_2\/add\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/add\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/conv2d_11\/BiasAdd",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/conv2d_11\/BiasAdd",
+      "blob_weights" : 81,
+      "K" : 32,
+      "blob_biases" : 79,
+      "name" : "model_2\/conv2d_11\/BiasAdd",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 128,
+      "bottom" : "model_2\/add\/add",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "block_size" : 2,
+      "bottom" : "model_2\/conv2d_11\/BiasAdd",
+      "weights" : {
+
+      },
+      "reverse" : 1,
+      "pixel_shuffle" : 0,
+      "debug_info" : "depth_to_space_0",
+      "top" : "depth_to_space_0",
+      "type" : "space_to_depth",
+      "name" : "depth_to_space_0"
+    },
+    {
+      "bottom" : "depth_to_space_0",
+      "weights" : {
+
+      },
+      "mode" : 0,
+      "debug_info" : "model_2\/p_re_lu_1\/Relu",
+      "top" : "model_2\/p_re_lu_1\/Relu",
+      "type" : "activation",
+      "name" : "model_2\/p_re_lu_1\/Relu"
+    },
+    {
+      "bottom" : "depth_to_space_0",
+      "alpha" : -1,
+      "operation" : 1,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/p_re_lu_1\/Neg_1",
+      "top" : "model_2\/p_re_lu_1\/Neg_1",
+      "type" : "elementwise",
+      "name" : "model_2\/p_re_lu_1\/Neg_1",
+      "beta" : 0
+    },
+    {
+      "bottom" : "model_2\/p_re_lu_1\/Neg_1",
+      "weights" : {
+
+      },
+      "mode" : 0,
+      "debug_info" : "model_2\/p_re_lu_1\/Relu_1",
+      "top" : "model_2\/p_re_lu_1\/Relu_1",
+      "type" : "activation",
+      "name" : "model_2\/p_re_lu_1\/Relu_1"
+    },
+    {
+      "top" : "const_21",
+      "w" : 1,
+      "h" : 1,
+      "name" : "const_21",
+      "nd_rank" : 4,
+      "type" : "load_constant",
+      "k" : 32,
+      "bottom" : "",
+      "debug_info" : "const_21",
+      "n" : 1,
+      "weights" : {
+
+      },
+      "constant_blob" : 83
+    },
+    {
+      "bottom" : "model_2\/p_re_lu_1\/Relu_1,const_21",
+      "alpha" : 1,
+      "operation" : 1,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/p_re_lu_1\/mul",
+      "top" : "model_2\/p_re_lu_1\/mul",
+      "type" : "elementwise",
+      "name" : "model_2\/p_re_lu_1\/mul",
+      "beta" : 0
+    },
+    {
+      "bottom" : "model_2\/p_re_lu_1\/Relu,model_2\/p_re_lu_1\/mul",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/p_re_lu_1\/add",
+      "top" : "model_2\/p_re_lu_1\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/p_re_lu_1\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "model_2\/conv2d_12\/BiasAdd",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "model_2\/conv2d_12\/BiasAdd",
+      "blob_weights" : 87,
+      "K" : 32,
+      "blob_biases" : 85,
+      "name" : "model_2\/conv2d_12\/BiasAdd",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 128,
+      "bottom" : "model_2\/p_re_lu_1\/add",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "block_size" : 2,
+      "bottom" : "model_2\/conv2d_12\/BiasAdd",
+      "weights" : {
+
+      },
+      "reverse" : 1,
+      "pixel_shuffle" : 0,
+      "debug_info" : "depth_to_space_1",
+      "top" : "depth_to_space_1",
+      "type" : "space_to_depth",
+      "name" : "depth_to_space_1"
+    },
+    {
+      "bottom" : "depth_to_space_1",
+      "weights" : {
+
+      },
+      "mode" : 0,
+      "debug_info" : "model_2\/p_re_lu_2\/Relu",
+      "top" : "model_2\/p_re_lu_2\/Relu",
+      "type" : "activation",
+      "name" : "model_2\/p_re_lu_2\/Relu"
+    },
+    {
+      "bottom" : "depth_to_space_1",
+      "alpha" : -1,
+      "operation" : 1,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/p_re_lu_2\/Neg_1",
+      "top" : "model_2\/p_re_lu_2\/Neg_1",
+      "type" : "elementwise",
+      "name" : "model_2\/p_re_lu_2\/Neg_1",
+      "beta" : 0
+    },
+    {
+      "bottom" : "model_2\/p_re_lu_2\/Neg_1",
+      "weights" : {
+
+      },
+      "mode" : 0,
+      "debug_info" : "model_2\/p_re_lu_2\/Relu_1",
+      "top" : "model_2\/p_re_lu_2\/Relu_1",
+      "type" : "activation",
+      "name" : "model_2\/p_re_lu_2\/Relu_1"
+    },
+    {
+      "top" : "const_23",
+      "w" : 1,
+      "h" : 1,
+      "name" : "const_23",
+      "nd_rank" : 4,
+      "type" : "load_constant",
+      "k" : 32,
+      "bottom" : "",
+      "debug_info" : "const_23",
+      "n" : 1,
+      "weights" : {
+
+      },
+      "constant_blob" : 89
+    },
+    {
+      "bottom" : "model_2\/p_re_lu_2\/Relu_1,const_23",
+      "alpha" : 1,
+      "operation" : 1,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/p_re_lu_2\/mul",
+      "top" : "model_2\/p_re_lu_2\/mul",
+      "type" : "elementwise",
+      "name" : "model_2\/p_re_lu_2\/mul",
+      "beta" : 0
+    },
+    {
+      "bottom" : "model_2\/p_re_lu_2\/Relu,model_2\/p_re_lu_2\/mul",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "model_2\/p_re_lu_2\/add",
+      "top" : "model_2\/p_re_lu_2\/add",
+      "type" : "elementwise",
+      "name" : "model_2\/p_re_lu_2\/add",
+      "beta" : 0
+    },
+    {
+      "pad_r" : 0,
+      "fused_relu" : 0,
+      "fused_tanh" : 0,
+      "debug_info" : "conv_0",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "top" : "conv_0",
+      "blob_weights" : 93,
+      "K" : 32,
+      "blob_biases" : 91,
+      "name" : "conv_0",
+      "has_batch_norm" : 0,
+      "type" : "convolution",
+      "n_groups" : 1,
+      "pad_t" : 0,
+      "has_biases" : 1,
+      "C" : 3,
+      "bottom" : "model_2\/p_re_lu_2\/add",
+      "weights" : {
+
+      },
+      "Nx" : 3,
+      "pad_mode" : 1,
+      "pad_value" : 0,
+      "Ny" : 3,
+      "n_parallel" : 1
+    },
+    {
+      "axis_h" : 0,
+      "axis_w" : 2,
+      "bottom" : "conv_0",
+      "axis_k" : 1,
+      "axis_n" : 3,
+      "axis_seq" : 4,
+      "weights" : {
+
+      },
+      "debug_info" : "transpose_65",
+      "top" : "transpose_65",
+      "type" : "transpose",
+      "name" : "transpose_65"
+    },
+    {
+      "bottom" : "transpose_65",
+      "weights" : {
+
+      },
+      "mode" : 1,
+      "debug_info" : "model_2\/conv2d_13\/Tanh",
+      "top" : "Identity",
+      "type" : "activation",
+      "name" : "model_2\/conv2d_13\/Tanh"
+    },
+    {
+      "axis_h" : 2,
+      "axis_w" : 1,
+      "bottom" : "Identity",
+      "axis_k" : 0,
+      "axis_n" : 3,
+      "axis_seq" : 4,
+      "weights" : {
+
+      },
+      "debug_info" : "permute",
+      "top" : "permute_out",
+      "type" : "transpose",
+      "name" : "permute"
+    },
+    {
+      "bottom" : "permute_out",
+      "alpha" : 127.5,
+      "beta" : 127.5,
+      "mode" : 6,
+      "weights" : {
+
+      },
+      "debug_info" : "activation",
+      "top" : "activation_out",
+      "type" : "activation",
+      "name" : "activation",
+      "attributes" : {
+        "is_output" : 1
+      }
+    }
+  ],
+  "transform_params" : {
+    "input_3" : {
+      "bias_a" : 0,
+      "bias_g" : 0,
+      "bias_r" : 0,
+      "bias_b" : 0,
+      "center_mean" : 0,
+      "is_network_bgr" : 0,
+      "scale" : 0.0039215688593685627
+    }
+  },
+  "storage" : "model.espresso.weights",
+  "metadata_in_weights" : [
+
+  ],
+  "properties" : {
+
+  },
+  "analyses" : {
+
+  },
+  "format_version" : 200
+}

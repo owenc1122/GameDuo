@@ -1,0 +1,40 @@
+{
+  "identifier" : "B6D4871A-4AA2-44A2-BD72-96AD42E2772D",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "30",
+      "familyShareable" : false,
+      "internalID" : "D6C65CF8-B336-4A74-8873-5ED59C47DB11",
+      "localizations" : [
+        {
+          "description" : "永久解锁高清画质、无限即时存档、iCloud 同步和全部进阶工具。",
+          "displayName" : "Duo 进阶版永久买断",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.duods.pro.lifetime",
+      "referenceName" : "Duo Pro Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "",
+    "_developerTeamID" : "",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "zh_CN",
+    "_storefront" : "CHN",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

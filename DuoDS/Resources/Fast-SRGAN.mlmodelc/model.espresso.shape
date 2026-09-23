@@ -1,0 +1,382 @@
+{
+  "layer_shapes" : {
+    "model_2\/block_1_expand_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/block_1_depthwise_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "permute_out" : {
+      "k" : 3,
+      "w" : 1024,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/block_2_depthwise_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/batch_normalization_8\/FusedBatchNormV3_nchw" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/block_3_depthwise_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu_2\/add" : {
+      "k" : 32,
+      "w" : 1024,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/block_4_depthwise_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "Identity" : {
+      "k" : 1024,
+      "w" : 3,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/conv2d_12\/BiasAdd" : {
+      "k" : 128,
+      "w" : 512,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 512
+    },
+    "model_2\/block_5_depthwise_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "input_3" : {
+      "k" : 3,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu_2\/Relu" : {
+      "k" : 32,
+      "w" : 1024,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/p_re_lu\/Neg_1" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/block_2_add\/add" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "depth_to_space_0" : {
+      "k" : 32,
+      "w" : 512,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 512
+    },
+    "model_2\/block_3_expand_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "depth_to_space_1" : {
+      "k" : 32,
+      "w" : 1024,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/expanded_conv_project_BN\/FusedBatchNormV3_nchw" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "activation_out" : {
+      "k" : 3,
+      "w" : 1024,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/block_1_project_BN\/FusedBatchNormV3_nchw" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/block_5_add\/add" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/batch_normalization_7\/FusedBatchNormV3_nchw" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/block_2_project_BN\/FusedBatchNormV3_nchw" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu_1\/Relu" : {
+      "k" : 32,
+      "w" : 512,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 512
+    },
+    "model_2\/p_re_lu_2\/Relu_1" : {
+      "k" : 32,
+      "w" : 1024,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/block_5_expand_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu_1\/Relu_1" : {
+      "k" : 32,
+      "w" : 512,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 512
+    },
+    "model_2\/p_re_lu_1\/mul" : {
+      "k" : 32,
+      "w" : 512,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 512
+    },
+    "model_2\/p_re_lu\/add" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu_2\/Neg_1" : {
+      "k" : 32,
+      "w" : 1024,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/block_3_project_BN\/FusedBatchNormV3_nchw" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/block_3_add\/add" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/add\/add" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/block_4_project_BN\/FusedBatchNormV3_nchw" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "const_21" : {
+      "k" : 32,
+      "w" : 1,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1
+    },
+    "transpose_65" : {
+      "k" : 1024,
+      "w" : 3,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/block_2_expand_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "const_23" : {
+      "k" : 32,
+      "w" : 1,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1
+    },
+    "const_1" : {
+      "k" : 32,
+      "w" : 1,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1
+    },
+    "model_2\/expanded_conv_depthwise_relu\/Relu" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu_2\/mul" : {
+      "k" : 32,
+      "w" : 1024,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/block_5_project_BN\/FusedBatchNormV3_nchw" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/block_1_add\/add" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/expanded_conv_add\/add" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu_1\/add" : {
+      "k" : 32,
+      "w" : 512,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 512
+    },
+    "conv_0" : {
+      "k" : 3,
+      "w" : 1024,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 1024
+    },
+    "model_2\/block_4_expand_relu\/Relu" : {
+      "k" : 192,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu_1\/Neg_1" : {
+      "k" : 32,
+      "w" : 512,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 512
+    },
+    "model_2\/p_re_lu\/mul" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu\/Relu" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/conv2d_11\/BiasAdd" : {
+      "k" : 128,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/p_re_lu\/Relu_1" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    },
+    "model_2\/block_4_add\/add" : {
+      "k" : 32,
+      "w" : 256,
+      "n" : 1,
+      "_rank" : 4,
+      "h" : 256
+    }
+  }
+}
