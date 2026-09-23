@@ -149,6 +149,8 @@ AzaharCoreBridge *activeBridge = nil;
 std::mutex stateMutex;
 std::array<bool, 32> buttonStates{};
 std::array<int16_t, 2> circlePad{};
+// Right analog stick (RETRO_DEVICE_INDEX_ANALOG_RIGHT); only cores that query it see it.
+std::array<int16_t, 2> rightStick{};
 std::array<int16_t, 2> touchPosition{};
 bool touchPressed = false;
 std::vector<int16_t> audioFrameBuffer;
@@ -641,6 +643,10 @@ int16_t inputStateCallback(unsigned port, unsigned device, unsigned index, unsig
         if (id == RETRO_DEVICE_ID_ANALOG_X) return circlePad[0];
         if (id == RETRO_DEVICE_ID_ANALOG_Y) return circlePad[1];
     }
+    if (device == RETRO_DEVICE_ANALOG && index == RETRO_DEVICE_INDEX_ANALOG_RIGHT) {
+        if (id == RETRO_DEVICE_ID_ANALOG_X) return rightStick[0];
+        if (id == RETRO_DEVICE_ID_ANALOG_Y) return rightStick[1];
+    }
     if (device == RETRO_DEVICE_POINTER) {
         if (id == RETRO_DEVICE_ID_POINTER_X) return touchPosition[0];
         if (id == RETRO_DEVICE_ID_POINTER_Y) return touchPosition[1];
@@ -753,6 +759,7 @@ int16_t inputStateCallback(unsigned port, unsigned device, unsigned index, unsig
         std::lock_guard<std::mutex> lock(stateMutex);
         buttonStates.fill(false);
         circlePad.fill(0);
+        rightStick.fill(0);
         touchPosition.fill(0);
         touchPressed = false;
 #if DEBUG
@@ -966,6 +973,17 @@ int16_t inputStateCallback(unsigned port, unsigned device, unsigned index, unsig
     std::lock_guard<std::mutex> lock(stateMutex);
     circlePad[0] = normalizedAxis(x);
     circlePad[1] = normalizedAxis(y);
+}
+
+- (void)setJoypadID:(NSUInteger)joypadID pressed:(BOOL)pressed {
+    std::lock_guard<std::mutex> lock(stateMutex);
+    if (joypadID < buttonStates.size()) buttonStates[joypadID] = pressed;
+}
+
+- (void)setRightAnalogX:(double)x y:(double)y {
+    std::lock_guard<std::mutex> lock(stateMutex);
+    rightStick[0] = normalizedAxis(x);
+    rightStick[1] = normalizedAxis(y);
 }
 
 - (void)setTouchX:(double)x y:(double)y pressed:(BOOL)pressed {

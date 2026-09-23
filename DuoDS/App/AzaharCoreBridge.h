@@ -56,6 +56,10 @@ typedef NS_ENUM(NSInteger, AzaharButton) {
 - (void)stop;
 - (void)setButton:(AzaharButton)button pressed:(BOOL)pressed;
 - (void)setCirclePadX:(double)x y:(double)y;
+// Raw libretro joypad id (0…15, e.g. L2 = 12, R2 = 13, L3 = 14, R3 = 15).
+- (void)setJoypadID:(NSUInteger)joypadID pressed:(BOOL)pressed;
+// Right analog stick, −1…1 (libretro: +Y is down).
+- (void)setRightAnalogX:(double)x y:(double)y;
 - (void)setTouchX:(double)x y:(double)y pressed:(BOOL)pressed;
 
 @end
