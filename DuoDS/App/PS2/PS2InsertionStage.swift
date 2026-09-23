@@ -618,14 +618,16 @@ extension DragCartridgeSceneView.Coordinator {
     /// `-ps2-hittest-selftest`: inserts up to three PS2 games in turn through the real insertion
     /// path. Each game screen logs what a touch on its console reaches (`DUO_PS2_HITTEST_…`) and
     /// exits; the next game follows once Cover Flow is idle again.
-    /// `-ps2-autoplay N` instead inserts only the N-th PS2 game and stays in it (screenshots).
+    /// `-ps2-autoplay N` instead inserts only the N-th PS2 game and stays in it (screenshots);
+    /// with `-ps2-autoplay-card` it inserts that game's memory card (save browser).
     func runPS2HitTestSelfTestIfRequested() {
         let arguments = ProcessInfo.processInfo.arguments
         let games = owner.games.indices.filter { owner.games[$0].platform == .ps2 }
         if let i = arguments.firstIndex(of: "-ps2-autoplay"), arguments.indices.contains(i + 1),
            let n = Int(arguments[i + 1]), games.indices.contains(n) {
             settleSelection(to: games[n]) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { _ = self.accessibleInsertPS2(.disc) }
+                let target: PS2PullTarget = arguments.contains("-ps2-autoplay-card") ? .memoryCard : .disc
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { _ = self.accessibleInsertPS2(target) }
             }
             return
         }

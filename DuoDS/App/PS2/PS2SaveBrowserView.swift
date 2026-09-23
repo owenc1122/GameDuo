@@ -413,6 +413,9 @@ struct PS2SaveBrowserView: View {
             busy = false
             switch result {
             case .success(let data):
+                #if DEBUG
+                NSLog("DUO_PS2_SAVE export ready name=%@ bytes=%d", save.entry.name, data.count)
+                #endif
                 exportName = save.entry.name
                 exportDocument = PS2PSUDocument(data: data)
                 isExporting = true
@@ -466,6 +469,9 @@ struct PS2SaveBrowserView: View {
             busy = false
             switch result {
             case .success(let entry):
+                #if DEBUG
+                NSLog("DUO_PS2_SAVE import ok name=%@", entry.name)
+                #endif
                 try? FileManager.default.removeItem(at: url)
                 focused = false
                 await reload(select: entry.name)
@@ -509,7 +515,19 @@ struct PS2SaveBrowserView: View {
         if args.contains("-ps2-save-browser-focus"), selected != nil {
             focused = true
         }
+        // `-ps2-save-browser-import <path>` / `-ps2-save-browser-export`: the same paths as the
+        // Files picker and the export button, once per launch, for QA without the system UI.
+        guard !Self.debugActionsRan else { return }
+        if let i = args.firstIndex(of: "-ps2-save-browser-import"), i + 1 < args.count {
+            Self.debugActionsRan = true
+            beginImport(URL(fileURLWithPath: args[i + 1]))
+        } else if args.contains("-ps2-save-browser-export"), let save = selected ?? saves.first {
+            Self.debugActionsRan = true
+            beginExport(save)
+        }
     }
+
+    private static var debugActionsRan = false
     #endif
 }
 
