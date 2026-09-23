@@ -1,0 +1,38 @@
+{
+  "PS2-Console": {
+    "file": "PS2_Model/exports/PS2-Console.usdz",
+    "reasons": [
+      "file not found: PS2_Model/exports/PS2-Console.usdz"
+    ],
+    "passed": false,
+    "checked_at": "2026-09-23T02:14:03+00:00"
+  },
+  "PS2-MemoryCard": {
+    "file": "PS2_Model/exports/PS2-MemoryCard.usdz",
+    "reasons": [],
+    "missing_nodes": [],
+    "size_mm_measured": [
+      42.0,
+      7.7,
+      56.5
+    ],
+    "size_mm_target": [
+      42.0,
+      7.5,
+      56.5
+    ],
+    "tris": 2834,
+    "max_tris": 3000,
+    "motion_results": [],
+    "passed": true,
+    "checked_at": "2026-09-23T02:24:53+00:00"
+  },
+  "PS2-DualShock2": {
+    "file": "PS2_Model/exports/PS2-DualShock2.usdz",
+    "reasons": [
+      "file not found: PS2_Model/exports/PS2-DualShock2.usdz"
+    ],
+    "passed": false,
+    "checked_at": "2026-09-23T02:14:03+00:00"
+  }
+}
