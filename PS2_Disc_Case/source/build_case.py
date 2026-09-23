@@ -158,10 +158,10 @@ def build():
     L, col = spec['layout'], spec['colors']
     plastic = C.mat('CASE_plastic', C.hex_rgba(col['case_plastic']), rough=0.62)
     emboss = C.mat('CASE_emboss', C.hex_rgba('#303035'), rough=0.5)
-    # neutral-grey tint so the film reads as gloss, not a white veil over black PP
-    sleeve = C.mat('CASE_sleeve', C.hex_rgba('#9A9A9A'), rough=0.04, alpha=0.12)
+    # clear PP/PET film: near-colourless, very transparent, glossy (specular does the work)
+    sleeve = C.mat('CASE_sleeve', C.hex_rgba('#FAFAFA'), rough=0.03, alpha=0.04)
     art = C.mat('COVER_ART_default', C.hex_rgba('#EDEDED'), rough=0.45)
-    ink_banner = C.mat('PRINT_banner_black', C.hex_rgba(col['banner']), rough=0.4)
+    ink_banner = C.mat('PRINT_banner_black', C.hex_rgba(col['banner']), rough=0.35)
     ink_white = C.mat('PRINT_wordmark_white', C.hex_rgba(col['wordmark']), rough=0.4)
     ps_cols = [C.mat(f'PRINT_ps_{k}', C.hex_rgba(col[f'ps_{k}']), rough=0.4)
                for k in ('red', 'yellow', 'green', 'blue')]
@@ -380,6 +380,33 @@ def group_collisions(root):
     return hits
 
 
+def test_pattern(w_px=1092, h_px=732):
+    """Neutral UV test image in insert space (NOT game art): tinted panels (back blue,
+    spine yellow, front green), 10 mm grid, red panel folds, a black diagonal and a
+    black 60 mm-radius circle centred on the spine, which must run on unbroken
+    across back | spine | front if the three COVER_ART meshes share one UV layout."""
+    import numpy as np
+    u = (np.arange(w_px) + 0.5) / w_px
+    v = (np.arange(h_px) + 0.5) / h_px
+    U, V = np.meshgrid(u, v)
+    img = np.ones((h_px, w_px, 4), dtype=np.float32)
+    img[..., :3] = (0.62, 0.75, 0.92)
+    img[(U >= 0.4744) & (U < 0.5256), :3] = (0.95, 0.85, 0.45)
+    img[U >= 0.5256, :3] = (0.62, 0.90, 0.62)
+    xm, ym = U * INSERT_W, V * INSERT_H
+    px = INSERT_W / w_px
+    grid = (np.abs((xm + 5) % 10 - 5) < px * 0.8) | (np.abs((ym + 5) % 10 - 5) < px * 0.8)
+    img[grid, :3] *= 0.7
+    for f in (0.4744, 0.5256):
+        img[np.abs(U - f) * INSERT_W < px * 1.2, :3] = (0.85, 0.1, 0.1)
+    diag = np.abs(ym - xm * INSERT_H / INSERT_W) < px * 1.8
+    ring = np.abs(np.hypot(xm - INSERT_W / 2, ym - INSERT_H / 2) - 60.0) < px * 1.8
+    img[diag | ring, :3] = 0.05
+    im = bpy.data.images.new('UV_TEST_PATTERN', w_px, h_px)
+    im.pixels.foreach_set(img.ravel())
+    return im
+
+
 def main():
     C.reset_scene()
     root = build()
@@ -398,17 +425,50 @@ def main():
     C.set_parent(disc, bpy.data.objects['CASE_DISC_ANCHOR'], keep_world=False)
     disc.location, disc.rotation_euler = (0, 0, 0), (0, 0, 0)
 
-    cam = D.setup_render(res=(1024, 768), samples=32)
-    D.area_light('KeyLight', (-0.2, 0.45, 0.55), (0, 0.095, 0), 0.4, 5)
-    D.area_light('FillLight', (0.45, 0.25, 0.35), (0, 0.095, 0), 0.5, 2)
+    cam = D.setup_render(res=(1024, 768), samples=32, world_rgb=(0.11, 0.115, 0.13))
+    D.area_light('KeyLight', (-0.2, 0.45, 0.55), (0, 0.095, 0), 0.4, 3.2)
+    # fill kept out of the front cover's mirror direction (glossy black banner)
+    D.area_light('FillLight', (-0.45, 0.05, 0.05), (0, 0.095, 0), 0.5, 0.9)
     D.look_at(cam, (-0.26, 0.19, 0.38), (0.0, 0.094, 0.0))
     D.render(ASSET_DIR / 'renders/case_closed.png')
 
     spine.rotation_euler[1] = lid.rotation_euler[1] = half
-    D.area_light('KeyLight', (-0.05, 0.3, 0.65), (-0.0745, 0.095, 0), 0.6, 6)
+    D.area_light('KeyLight', (-0.05, 0.3, 0.65), (-0.0745, 0.095, 0), 0.6, 3)
     D.look_at(cam, (-0.07, 0.03, 0.60), (-0.0745, 0.093, -0.005))
     D.render(ASSET_DIR / 'renders/case_open.png')
+
+    # render-only UV proof: test pattern through the three insert meshes, prints hidden
+    im = test_pattern()
+    tm = bpy.data.materials.new('UV_TEST')
+    tm.use_nodes = True
+    nt = tm.node_tree
+    tex = nt.nodes.new('ShaderNodeTexImage')
+    tex.image = im
+    nt.links.new(tex.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
+    nt.nodes['Principled BSDF'].inputs['Roughness'].default_value = 0.45
+    arts = [bpy.data.objects[n] for n in ('COVER_ART', 'COVER_ART_SPINE', 'COVER_ART_BACK')]
+    prints = [o for g in ('TRADEMARK_PRINTS_SPINE', 'TRADEMARK_PRINTS_LID')
+              for o in bpy.data.objects[g].children]
+    for o in arts:
+        o.data.materials[0] = tm
+    for o in prints:
+        o.hide_render = True
+    # outside of the fully open case = the insert laid flat (back | spine | front)
+    D.area_light('UnderKey', (-0.07, 0.25, -0.6), (-0.0745, 0.095, 0), 0.6, 3)
+    D.look_at(cam, (-0.0745, 0.095, -0.60), (-0.0745, 0.095, 0.0))
+    D.render(ASSET_DIR / 'renders/case_open_cover_outside.png')
+    bpy.data.objects.remove(bpy.data.objects['UnderKey'], do_unlink=True)
     spine.rotation_euler[1] = lid.rotation_euler[1] = 0.0
+    D.area_light('KeyLight', (-0.2, 0.45, 0.55), (0, 0.095, 0), 0.4, 3.2)
+    D.look_at(cam, (-0.26, 0.19, 0.38), (0.0, 0.094, 0.0))
+    D.render(ASSET_DIR / 'renders/case_closed_cover.png')
+    art_default = bpy.data.materials['COVER_ART_default']
+    for o in arts:
+        o.data.materials[0] = art_default
+    for o in prints:
+        o.hide_render = False
+    bpy.data.materials.remove(tm)
+    bpy.data.images.remove(im)
     C.save_blend(ASSET_DIR / 'PS2_Disc_Case.blend')
 
 
