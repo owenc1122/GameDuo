@@ -56,6 +56,7 @@ function scanCard(M) {
 
 let M = null;
 let started = false;
+let paused = false;
 let cardSnapshot = new Map();
 let syncing = false;
 
@@ -121,16 +122,35 @@ window.duo = {
   setPad(buttons, lx, ly, rx, ry) {
     M?.duoSetPad(buttons >>> 0, lx, ly, rx, ry);
   },
-  pause() { syncCard(); M?.duoPause(); suspendAudio(); },
-  resume() { M?.duoResume(); resumeAudio(); },
+  pause() { paused = true; syncCard(); M?.duoPause(); suspendAudio(); },
+  resume() { paused = false; M?.duoResume(); resumeAudio(); },
   syncCard() { return syncCard(); },
   resize() {
     if (!M || !started) return;
     const { canvas, width, height } = canvasSize();
     if (canvas.width === width && canvas.height === height) return;
+    post({ type: 'log', message: `resize ${canvas.width}x${canvas.height} -> ${width}x${height}` });
     M.duoSetPresentation(width, height);
   },
   setFrameLimit(enabled) { M?.duoSetFrameLimit(!!enabled); },
+  // QA (debug builds only): touch the memory card from the core's side.
+  debugCardWrite(path, text) {
+    if (!config.debug || !M) return false;
+    const full = `${MC}/${path}`;
+    M.FS.mkdirTree(full.substring(0, full.lastIndexOf('/')));
+    M.FS.writeFile(full, text);
+    return true;
+  },
+  debugCardDelete(path) {
+    if (!config.debug || !M) return false;
+    const full = `${MC}/${path}`;
+    M.FS.unlink(full);
+    try { M.FS.rmdir(full.substring(0, full.lastIndexOf('/'))); } catch (e) {}
+    return true;
+  },
+  debugCardList() {
+    return config.debug && M ? [...scanCard(M).keys()] : [];
+  },
 };
 
 async function boot() {
@@ -138,7 +158,10 @@ async function boot() {
   M = await Play({
     locateFile: (p) => `${location.origin}/${p}`,
     mainScriptUrlOrBlob: `${location.origin}/Play.js`,
-    print: (t) => config.debug && post({ type: 'log', message: t }),
+    print: (t) => {
+      if (t.startsWith('Failed to start')) post({ type: 'error', message: `boot: ${t}` });
+      else if (config.debug) post({ type: 'log', message: t });
+    },
     printErr: (t) => post({ type: 'log', message: t }),
     onAbort: (what) => post({ type: 'error', message: `abort: ${what}` }),
   });
@@ -155,6 +178,7 @@ async function boot() {
   }
 
   const { width, height } = canvasSize();
+  post({ type: 'log', message: `init canvas ${width}x${height} dpr=${window.devicePixelRatio}` });
   M.duoInit(width, height, MC, HOST);
   started = true;
   await startAudio();
@@ -169,10 +193,11 @@ async function boot() {
     if (!sawFrame && frames > 0) { sawFrame = true; post({ type: 'firstFrame' }); }
     const ring = new Uint32Array(M.duoMemory().buffer, M.duoAudioRing(), 2);
     post({ type: 'stats', fps: frames, audioWritten: ring[0], audioBuffered: (ring[0] - ring[1]) >>> 0, audioState: audio ? audio.state : 'none' });
-    resumeAudio();
+    if (!paused) resumeAudio();
   }, 1000);
   setInterval(syncCard, 1000);
   window.addEventListener('resize', () => window.duo.resize());
+  document.addEventListener('visibilitychange', () => post({ type: 'log', message: `visibility ${document.visibilityState}` }));
 }
 
 boot().catch((e) => post({ type: 'error', message: `boot: ${e && e.stack || e}` }));

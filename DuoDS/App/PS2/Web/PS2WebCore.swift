@@ -143,14 +143,36 @@ final class PS2WebCore: NSObject, ObservableObject, PS2InputSink {
 
     private func enterBackground() {
         guard state == .running else { return }
+        log("background: pause")
         suspend()
     }
 
     private func enterForeground() {
         guard state == .paused, !userPaused else { return }
+        log("foreground: resume")
         state = .running
         call("window.duo && window.duo.resume()")
     }
+
+    #if DEBUG
+    /// `-ps2-core-card-selftest`: a file written on the core's memory card must appear in the
+    /// game's card folder, and disappear again after the core deletes it.
+    private func runCardSelfTest() {
+        let file = content.memoryCard.appendingPathComponent("DUOQA-SELFTEST/probe.bin")
+        call("window.duo.debugCardWrite('DUOQA-SELFTEST/probe.bin', 'duo-card-probe')")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self else { return }
+            let data = try? Data(contentsOf: file)
+            NSLog("DUO_PS2_CORE card-selftest write %@", data == Data("duo-card-probe".utf8) ? "PASS" : "FAIL")
+            self.call("window.duo.debugCardDelete('DUOQA-SELFTEST/probe.bin')")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                let gone = !FileManager.default.fileExists(atPath: file.path)
+                let dirGone = !FileManager.default.fileExists(atPath: file.deletingLastPathComponent().path)
+                NSLog("DUO_PS2_CORE card-selftest delete %@ (dir removed: %d)", gone ? "PASS" : "FAIL", dirGone ? 1 : 0)
+            }
+        }
+    }
+    #endif
 
     // MARK: Input
 
@@ -187,6 +209,9 @@ final class PS2WebCore: NSObject, ObservableObject, PS2InputSink {
             if state == .booting { state = .running }
             call("window.duo.resize()")
             if pad != PS2PadState() { sentPad = PS2PadState(); schedulePad() }
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-ps2-core-card-selftest") { runCardSelfTest() }
+            #endif
         case "firstFrame":
             hasFrame = true
         case "stats":
@@ -203,7 +228,11 @@ final class PS2WebCore: NSObject, ObservableObject, PS2InputSink {
         case "error":
             let text = message["message"] as? String ?? "unknown"
             log("error \(text)")
-            if text.hasPrefix("abort") || text.hasPrefix("boot") { state = .failed(text) }
+            if text.hasPrefix("boot") {
+                state = .failed(String(localized: "无法启动：光盘里没有可运行的 PS2 程序"))
+            } else if text.hasPrefix("abort") {
+                state = .failed(String(localized: "PS2 内核已停止"))
+            }
         case "log":
             #if DEBUG
             if let text = message["message"] as? String { NSLog("DUO_PS2_CORE log %@", String(text.prefix(300))) }

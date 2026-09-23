@@ -693,7 +693,8 @@ final class PS2RuntimeModel: ObservableObject {
     }
 
     /// Boots the game in the PS2 core. DEBUG: `-ps2-core-elf <folder>` boots the first ELF in
-    /// that folder instead (its files are mounted as `host:`).
+    /// that folder instead (its files are mounted as `host:`); `-ps2-core-disc <image>` boots that
+    /// disc image.
     func startCore(for game: GameLibraryItem?) {
         guard core == nil else { return }
         var content: PS2WebCore.Content?
@@ -705,6 +706,9 @@ final class PS2RuntimeModel: ObservableObject {
                 .first { $0.lowercased().hasSuffix(".elf") }
             let card = ROMFiles.supportDirectory().appendingPathComponent("PS2/MemoryCards/QA-ELF", isDirectory: true)
             content = PS2WebCore.Content(disc: nil, elfFolder: folder, elfName: elf, memoryCard: card)
+        } else if let i = arguments.firstIndex(of: "-ps2-core-disc"), arguments.indices.contains(i + 1) {
+            let card = ROMFiles.supportDirectory().appendingPathComponent("PS2/MemoryCards/QA-DISC", isDirectory: true)
+            content = PS2WebCore.Content(disc: URL(fileURLWithPath: arguments[i + 1]), elfFolder: nil, elfName: nil, memoryCard: card)
         }
         #endif
         if content == nil, let game {
