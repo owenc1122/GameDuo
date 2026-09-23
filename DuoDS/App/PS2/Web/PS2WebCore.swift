@@ -211,6 +211,9 @@ final class PS2WebCore: NSObject, ObservableObject, PS2InputSink {
             if pad != PS2PadState() { sentPad = PS2PadState(); schedulePad() }
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-ps2-core-card-selftest") { runCardSelfTest() }
+            if ProcessInfo.processInfo.arguments.contains("-ps2-core-audio-capture") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.call("window.duo.debugCaptureAudio(10)") }
+            }
             #endif
         case "firstFrame":
             hasFrame = true
@@ -219,12 +222,24 @@ final class PS2WebCore: NSObject, ObservableObject, PS2InputSink {
             #if DEBUG
             NSLog("DUO_PS2_CORE fps=%d audio=%@ buffered=%@ written=%@", fps, String(describing: message["audioState"] ?? "-"),
                   String(describing: message["audioBuffered"] ?? "-"), String(describing: message["audioWritten"] ?? "-"))
+            if let a = message["audioStats"] as? [String: Any] {
+                NSLog("DUO_PS2_AUDIO quanta=%@ underruns=%@ skips=%@ min=%@ step=%@ rate=%@ base=%@", "\(a["quanta"] ?? "-")", "\(a["underruns"] ?? "-")",
+                      "\(a["skips"] ?? "-")", "\(a["minAvailable"] ?? "-")", "\(a["step"] ?? "-")", "\(message["audioRate"] ?? "-")", "\(message["baseLatency"] ?? "-")")
+            }
             #endif
         case "rumble":
             let large = message["large"] as? Int ?? 0, small = message["small"] as? Int ?? 0
             rumble.set(large: UInt8(clamping: large), small: UInt8(clamping: small))
         case "card":
             applyCard(message)
+        #if DEBUG
+        case "audioCapture":
+            if let base64 = message["data"] as? String, let pcm = Data(base64Encoded: base64) {
+                let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("duo_audio_capture.pcm")
+                try? pcm.write(to: url)
+                NSLog("DUO_PS2_AUDIO capture saved %d bytes", pcm.count)
+            }
+        #endif
         case "error":
             let text = message["message"] as? String ?? "unknown"
             log("error \(text)")

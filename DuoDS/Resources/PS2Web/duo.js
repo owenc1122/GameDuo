@@ -87,6 +87,8 @@ function syncCard() {
 }
 
 let audio = null;
+let audioStats = null;
+let audioNode = null;
 
 // Plays the core's audio ring (SH_Duo) through an AudioWorklet at the SPU's 44.1 kHz.
 async function startAudio() {
@@ -95,6 +97,14 @@ async function startAudio() {
     await audio.audioWorklet.addModule('duo_audio.js');
     const node = new AudioWorkletNode(audio, 'duo-ps2-audio', { numberOfInputs: 0, outputChannelCount: [2] });
     node.port.postMessage({ memory: M.duoMemory(), ring: M.duoAudioRing(), samplesOffset: M.duoAudioRingSamplesOffset() });
+    node.port.onmessage = (e) => {
+      if (e.data.captured) {
+        const f = e.data.captured, pcm = new Int16Array(f.length);
+        for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(f[i] * 32767)));
+        post({ type: 'audioCapture', data: base64.encode(new Uint8Array(pcm.buffer)) });
+      } else audioStats = e.data;
+    };
+    audioNode = node;
     node.connect(audio.destination);
     resumeAudio();
   } catch (e) {
@@ -148,6 +158,9 @@ window.duo = {
     try { M.FS.rmdir(full.substring(0, full.lastIndexOf('/'))); } catch (e) {}
     return true;
   },
+  debugCaptureAudio(seconds) {
+    if (config.debug && audioNode) audioNode.port.postMessage({ capture: seconds });
+  },
   debugCardList() {
     return config.debug && M ? [...scanCard(M).keys()] : [];
   },
@@ -192,7 +205,7 @@ async function boot() {
     M.duoClearStats();
     if (!sawFrame && frames > 0) { sawFrame = true; post({ type: 'firstFrame' }); }
     const ring = new Uint32Array(M.duoMemory().buffer, M.duoAudioRing(), 2);
-    post({ type: 'stats', fps: frames, audioWritten: ring[0], audioBuffered: (ring[0] - ring[1]) >>> 0, audioState: audio ? audio.state : 'none' });
+    post({ type: 'stats', fps: frames, audioWritten: ring[0], audioBuffered: (ring[0] - ring[1]) >>> 0, audioState: audio ? audio.state : 'none', audioStats, audioRate: audio ? audio.sampleRate : 0, baseLatency: audio ? audio.baseLatency : 0 });
     if (!paused) resumeAudio();
   }, 1000);
   setInterval(syncCard, 1000);

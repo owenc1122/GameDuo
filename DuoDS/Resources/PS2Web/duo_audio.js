@@ -14,7 +14,14 @@ class DuoPS2Audio extends AudioWorkletProcessor {
     this.playing = false;
     this.step = 1;
     this.frac = 0;
+    this.stats = { quanta: 0, underruns: 0, skips: 0, minAvailable: 1e9 };
+    this.lastReport = currentTime;
+    this.capture = null;
     this.port.onmessage = (event) => {
+      if (event.data.capture) {
+        this.capture = { data: new Float32Array(Math.round(event.data.capture * sampleRate) * 2), pos: 0 };
+        return;
+      }
       const { memory, ring, samplesOffset } = event.data;
       const buffer = memory.buffer;
       this.indices = new Uint32Array(buffer, ring, 4); // writeFrames, readFrames, capacity, sampleRate
@@ -37,6 +44,14 @@ class DuoPS2Audio extends AudioWorkletProcessor {
       read = (write - TARGET) >>> 0;
       available = TARGET;
       this.frac = 0;
+      this.stats.skips++;
+    }
+    this.stats.quanta++;
+    if (this.playing) this.stats.minAvailable = Math.min(this.stats.minAvailable, available);
+    if (currentTime - this.lastReport >= 1) {
+      this.port.postMessage({ ...this.stats, step: this.step });
+      this.stats = { quanta: 0, underruns: 0, skips: 0, minAvailable: 1e9 };
+      this.lastReport = currentTime;
     }
     if (!this.playing && available >= PRIME) this.playing = true;
 
@@ -44,8 +59,10 @@ class DuoPS2Audio extends AudioWorkletProcessor {
     this.step += (desired - this.step) * 0.02;
     const needed = Math.ceil(this.frac + count * this.step) + 1;
     if (!this.playing || available < needed) {
+      if (this.playing) this.stats.underruns++;
       this.playing = false;
       left.fill(0); right.fill(0);
+      if (this.capture) this.record(left, right);
       Atomics.store(this.indices, 1, read);
       return true;
     }
@@ -59,11 +76,24 @@ class DuoPS2Audio extends AudioWorkletProcessor {
       right[i] = (samples[a * 2 + 1] * (1 - t) + samples[b * 2 + 1] * t) / 32768;
       pos += step;
     }
+    if (this.capture) this.record(left, right);
     const consumed = Math.floor(pos);
     this.frac = pos - consumed;
     Atomics.store(this.indices, 1, (read + consumed) >>> 0);
     return true;
   }
 }
+
+DuoPS2Audio.prototype.record = function (left, right) {
+  const c = this.capture;
+  for (let i = 0; i < left.length && c.pos < c.data.length; i++) {
+    c.data[c.pos++] = left[i];
+    c.data[c.pos++] = right[i];
+  }
+  if (c.pos >= c.data.length) {
+    this.port.postMessage({ captured: c.data }, [c.data.buffer]);
+    this.capture = null;
+  }
+};
 
 registerProcessor('duo-ps2-audio', DuoPS2Audio);

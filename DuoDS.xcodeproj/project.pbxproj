@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E2E2FA23E02C3EF9FCC42962 /* PS2Web in Resources */ = {isa = PBXBuildFile; fileRef = E2E29FFDAEAAC973A111B63F /* PS2Web */; };
+		E2E28E93FD49A4FA09C8C3EA /* PS2WebSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E288F56CD2528AB69F436F /* PS2WebSchemeHandler.swift */; };
+		E2E231B2BD99622A8FC9EFC0 /* PS2WebCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E263D335FB9BA03C82A3B4 /* PS2WebCore.swift */; };
+		E2E23C0AA9DF0A5967118A1D /* PS2ByteRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E2435A69491B7DE691FF9C /* PS2ByteRange.swift */; };
+		E2E2BBF1D7FAD40CD16B53BE /* PS2CardPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E23F114F82A65E79C1B46C /* PS2CardPath.swift */; };
+		E2E24BAFCCFA54C614EEFB33 /* PS2PadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E2D3248897940D886C3BA1 /* PS2PadState.swift */; };
 		D00520260921000000000003 /* Localizable in Resources */ = {isa = PBXBuildFile; fileRef = D00520260921000000000004; };
 		D00520260921000000000001 /* Assets in Resources */ = {isa = PBXBuildFile; fileRef = D00520260921000000000002; };
 		D0A1B2C3D4E5F60718293A51 /* Console-Studio.hdr in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF08; };
@@ -93,6 +99,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		E2E29FFDAEAAC973A111B63F /* PS2Web */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "DuoDS/Resources/PS2Web"; sourceTree = SOURCE_ROOT; };
+		E2E288F56CD2528AB69F436F /* PS2WebSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PS2WebSchemeHandler.swift; path = Web/PS2WebSchemeHandler.swift; sourceTree = "<group>"; };
+		E2E263D335FB9BA03C82A3B4 /* PS2WebCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PS2WebCore.swift; path = Web/PS2WebCore.swift; sourceTree = "<group>"; };
+		E2E2435A69491B7DE691FF9C /* PS2ByteRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PS2ByteRange.swift; sourceTree = "<group>"; };
+		E2E23F114F82A65E79C1B46C /* PS2CardPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PS2CardPath.swift; sourceTree = "<group>"; };
+		E2E2D3248897940D886C3BA1 /* PS2PadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PS2PadState.swift; sourceTree = "<group>"; };
 		D00520260921000000000004 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = DuoDS/Resources/Localizable.xcstrings; sourceTree = SOURCE_ROOT; };
 		D00520260921000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = DuoDS/Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		C0FFEE1234567890ABCDEF08 /* Console-Studio.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Console-Studio.hdr"; sourceTree = "<group>"; };
@@ -277,6 +289,9 @@ D00D20000000000000000103,
 				E2E2E2D06DAAC90871FA4F41 /* PS2Core.swift */,
 				E2E29F97B4BECCF11DB1A31F /* PS2Disc.swift */,
 				E2E2A75B3398D0655B12CC88 /* PS2CoverArt.swift */,
+				E2E2435A69491B7DE691FF9C /* PS2ByteRange.swift */,
+				E2E23F114F82A65E79C1B46C /* PS2CardPath.swift */,
+				E2E2D3248897940D886C3BA1 /* PS2PadState.swift */,
 				E2E29D2CEB4597433DFB1F16 /* PS2MemoryCard.swift */,
 				E2E29179D3E65E29AE72B17F /* PS2SaveArchive.swift */,
 				E2E231BA8C0F39E81E8961B6 /* PS2IconSys.swift */,
@@ -294,6 +309,8 @@ D00D20000000000000000103,
 				E2E274F3E9595B9CF9DBB8AF /* PS2GameView.swift */,
 				E2E26BE6A32E822F0F4EB1B4 /* PS2ControllerView.swift */,
 				E2E2037B5AF46E33CCD95F35 /* PS2CRTShutdown.swift */,
+				E2E288F56CD2528AB69F436F /* PS2WebSchemeHandler.swift */,
+				E2E263D335FB9BA03C82A3B4 /* PS2WebCore.swift */,
 				E2E2EC59F4453650750AAFC1 /* PS2SaveBrowserView.swift */,
 				E2E2FE460B5F6A189D8D508B /* PS2Feedback.swift */,
 			);
@@ -381,6 +398,7 @@ D00D20000000000000000103,
 			E2E22453CBD0C5EF22643589 /* PS2-DVD.usdz in Resources */,
 			E2E233D2C8874CC75BA802A4 /* PS2-Case.usdz in Resources */,
 			E2E20C1DAE56B4512375E7EE /* PS2Audio in Resources */,
+			E2E2FA23E02C3EF9FCC42962 /* PS2Web in Resources */,
 		);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -405,6 +423,9 @@ D00D20000000000000000203,
 				E2E2D3ED6304CDCFB2E8961A /* PS2Core.swift in Sources */,
 				E2E2AA7215A08A5A5311FF61 /* PS2Disc.swift in Sources */,
 				E2E2B5952BD747EB3C56111D /* PS2CoverArt.swift in Sources */,
+				E2E23C0AA9DF0A5967118A1D /* PS2ByteRange.swift in Sources */,
+				E2E2BBF1D7FAD40CD16B53BE /* PS2CardPath.swift in Sources */,
+				E2E24BAFCCFA54C614EEFB33 /* PS2PadState.swift in Sources */,
 				E2E207C15913C26DF01B5AC3 /* PS2MemoryCard.swift in Sources */,
 				E2E27238DB8DEBC2DA5ED513 /* PS2SaveArchive.swift in Sources */,
 				E2E2E32E7AD8DAD84AA29069 /* PS2IconSys.swift in Sources */,
@@ -414,6 +435,8 @@ D00D20000000000000000203,
 				E2E229D3CE54FB54FEFB29BA /* PS2GameView.swift in Sources */,
 				E2E2C1F75AE14547671081B3 /* PS2ControllerView.swift in Sources */,
 				E2E2EEBC1AED96457FD2E461 /* PS2CRTShutdown.swift in Sources */,
+				E2E28E93FD49A4FA09C8C3EA /* PS2WebSchemeHandler.swift in Sources */,
+				E2E231B2BD99622A8FC9EFC0 /* PS2WebCore.swift in Sources */,
 				E2E23AD71DEF734E0CE726CC /* PS2SaveBrowserView.swift in Sources */,
 				E2E2B63C2B25ED4931D0CF89 /* PS2Feedback.swift in Sources */,
 			);
