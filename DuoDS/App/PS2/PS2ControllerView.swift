@@ -31,10 +31,17 @@ enum PS2Shoulder: CaseIterable {
 enum PS2ControllerMetrics {
     /// Space reserved above the body for the flat L1/L2/R1/R2 buttons.
     static let shoulderRowDepth: CGFloat = 0.028
-    /// Where the short controller-side cable stub ends (model Z; the body ends at −0.0455).
-    static let cableStubEndZ: Float = -0.0495
     static let cableRadius: Float = 0.002
     static let cableExit = SIMD3<Float>(0, 0.0385, -0.033)
+    /// The model's ribbed strain-relief boot (`CABLE` mesh): (offset along the cable from
+    /// `cableExit.z`, radius) in metres, from inside the body out to the boot's end face.
+    static let bootProfile: [(z: Float, r: Float)] = [
+        (0.004, 0.00475), (0, 0.00475), (-0.0003, 0.00452), (-0.0009, 0.00407), (-0.0023, 0.00407),
+        (-0.0029, 0.00367), (-0.0037, 0.00367), (-0.0043, 0.00362), (-0.0049, 0.00326), (-0.0057, 0.00326),
+        (-0.0063, 0.00317), (-0.0069, 0.00285), (-0.008, 0.00285), (-0.008, 0)
+    ]
+    /// Model Z of the boot's end face, where the live cable comes out.
+    static let cableBootEndZ: Float = cableExit.z - 0.008
     static let stickTilt: Float = 0.4363
     static let stickPress: Float = 0.0008
     static let dpadTilt: Float = 0.0873
@@ -48,6 +55,16 @@ enum PS2ControllerMetrics {
         "BTN_CIRCLE": 8, "BTN_TRIANGLE": 9
     ]
     static let dpadIDs = (up: 4, down: 5, left: 6, right: 7)
+
+    /// Matte black PVC with a soft sheen, shared by the boot and the live cable.
+    @MainActor static func cableMaterial() -> SCNMaterial {
+        let material = SCNMaterial()
+        material.lightingModel = .physicallyBased
+        material.diffuse.contents = UIColor(red: 0.105, green: 0.105, blue: 0.112, alpha: 1)
+        material.roughness.contents = 0.34
+        material.metalness.contents = 0.0
+        return material
+    }
     static let l3 = 14
     static let r3 = 15
 }
@@ -120,7 +137,7 @@ final class PS2ControllerModel {
         #endif
         measureFootprint()
         bindLED()
-        addCableStub()
+        addCableBoot()
         setAnalogMode(true)
 
         let camera = SCNCamera()
@@ -183,29 +200,40 @@ final class PS2ControllerModel {
         ledOffDiffuse = ledMaterials.first?.diffuse.contents
     }
 
-    /// Strain relief plus a few millimetres of cable, so the live cable visibly leaves the body.
-    private func addCableStub() {
-        let material = SCNMaterial()
-        material.diffuse.contents = UIColor(red: 0.10, green: 0.10, blue: 0.105, alpha: 1)
-        material.roughness.contents = 0.55
-        material.lightingModel = .physicallyBased
+    /// The ribbed strain-relief boot at the cable exit (the live cable to the console leaves
+    /// its end face, drawn by the console scene), lathed from the model's profile.
+    private func addCableBoot() {
         let exit = PS2ControllerMetrics.cableExit
-        let relief = SCNCylinder(radius: 0.00475, height: 0.008)
-        relief.materials = [material]
-        let reliefNode = SCNNode(geometry: relief)
-        reliefNode.eulerAngles.x = .pi / 2
-        reliefNode.simdPosition = SIMD3(exit.x, exit.y, exit.z - 0.004)
-        let length = (exit.z - 0.008) - PS2ControllerMetrics.cableStubEndZ
-        let cable = SCNCylinder(radius: CGFloat(PS2ControllerMetrics.cableRadius), height: CGFloat(length))
-        cable.materials = [material]
-        let cableNode = SCNNode(geometry: cable)
-        cableNode.eulerAngles.x = .pi / 2
-        cableNode.simdPosition = SIMD3(exit.x, exit.y, PS2ControllerMetrics.cableStubEndZ + length / 2)
-        let stub = SCNNode()
-        stub.name = "DUO_CABLE_STUB"
-        stub.addChildNode(reliefNode)
-        stub.addChildNode(cableNode)
-        scene.rootNode.addChildNode(stub)
+        let sides = 28
+        var vertices: [SCNVector3] = []
+        var normals: [SCNVector3] = []
+        var indices: [UInt32] = []
+        let profile = PS2ControllerMetrics.bootProfile
+        for (a, b) in zip(profile, profile.dropFirst()) {
+            // Flat-shaded per profile segment, so the ribs read as crisp steps.
+            let dz = b.z - a.z, dr = b.r - a.r
+            let length = max(1e-6, hypot(dz, dr))
+            let (nr, nz) = (-dz / length, dr / length)
+            let base = UInt32(vertices.count)
+            for point in [a, b] {
+                for j in 0...sides {
+                    let angle = Float(j) / Float(sides) * 2 * .pi
+                    vertices.append(SCNVector3(exit.x + point.r * cos(angle), exit.y + point.r * sin(angle), exit.z + point.z))
+                    normals.append(SCNVector3(nr * cos(angle), nr * sin(angle), nz))
+                }
+            }
+            let ring = UInt32(sides + 1)
+            for j in 0..<UInt32(sides) {
+                indices += [base + j, base + j + 1, base + ring + j, base + j + 1, base + ring + j + 1, base + ring + j]
+            }
+        }
+        let geometry = SCNGeometry(sources: [SCNGeometrySource(vertices: vertices), SCNGeometrySource(normals: normals)],
+                                   elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
+        geometry.materials = [PS2ControllerMetrics.cableMaterial()]
+        geometry.firstMaterial?.isDoubleSided = true
+        let boot = SCNNode(geometry: geometry)
+        boot.name = "DUO_CABLE_BOOT"
+        scene.rootNode.addChildNode(boot)
     }
 
     // MARK: Viewport
@@ -244,6 +272,18 @@ final class PS2ControllerModel {
     }
 
     func points(millimetres: CGFloat) -> CGFloat { millimetres / 1000 * pointsPerMeter }
+
+    /// Clear half-width (model metres, from the body centre) between the flat shoulder buttons'
+    /// touch areas (22 mm wide, +3 mm slop), where the distant console may sit.
+    var shoulderClearance: CGFloat {
+        let offsets = ["L1", "R1"].compactMap { name -> Float? in
+            guard let position = rest[name], let node = nodes[name] else { return nil }
+            let world = node.parent?.convertPosition(position, to: nil) ?? position
+            return abs(world.x - footprint.center.x)
+        }
+        guard let nearest = offsets.min() else { return 0.03 }
+        return max(0.01, CGFloat(nearest) - 0.014)
+    }
 
     // MARK: Motion
 
@@ -526,10 +566,19 @@ final class PS2ControllerTouchView: UIView {
 
     private func pressHaptic(at point: CGPoint, intensity: CGFloat = 0.85) {
         pressFeedback.impactOccurred(intensity: intensity, at: point)
+        Self.logHaptic("press", intensity, point)
     }
 
     private func releaseHaptic(at point: CGPoint) {
         releaseFeedback.impactOccurred(intensity: 0.5, at: point)
+        Self.logHaptic("release", 0.5, point)
+    }
+
+    /// DEBUG trace so haptics can be verified on the simulator, which has no Taptic Engine.
+    static func logHaptic(_ kind: String, _ intensity: CGFloat, _ point: CGPoint) {
+        #if DEBUG
+        NSLog("DUO_PS2_HAPTIC %@ intensity=%.2f at=(%.0f,%.0f)", kind, intensity, point.x, point.y)
+        #endif
     }
 
     private func beginButton(_ name: String, at point: CGPoint) {
@@ -596,6 +645,13 @@ final class PS2ControllerTouchView: UIView {
     }
 
     // MARK: Touches
+
+    /// Only the body and the shoulder buttons take touches: the empty strip between the shoulder
+    /// buttons lets them through to the distant console behind.
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        guard super.point(inside: point, with: event) else { return false }
+        return point.y >= bodyRect.minY || control(at: point) != nil
+    }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !controlsLocked else { return }
@@ -664,6 +720,7 @@ final class PS2ControllerTouchView: UIView {
                     if d > stickRing, state.ringArmed {
                         state.ringArmed = false
                         ringFeedback.impactOccurred(intensity: 0.6, at: model.restPoint(stick == .left ? "STICK_L" : "STICK_R"))
+                        Self.logHaptic(stick == .left ? "ring-left" : "ring-right", 0.6, p)
                     } else if d < stickRing * 0.85 {
                         state.ringArmed = true
                     }

@@ -4,53 +4,82 @@ import UIKit
 
 // MARK: - Layout
 
-/// Portrait layout shared by every device: game screen on top, distant console in the gap,
-/// DualShock 2 (with the flat shoulder row above it) at the bottom. All rects are in
-/// PS2GameView coordinates (full screen, safe areas ignored).
+/// Portrait layout shared by every device. The top half of the usable height is the TV: the
+/// picture is aspect-fit inside it, letterboxed black. The DualShock 2 (with the flat shoulder
+/// row above it) is as large as fits in the bottom half. The distant console fills whatever gap
+/// is left, down between the shoulder buttons if needed. All rects are in PS2GameView
+/// coordinates (full screen, safe areas ignored).
 struct PS2GameLayout: Equatable {
     var size: CGSize
+    /// The TV: from `topInset` to half the height.
+    var screenRegion: CGRect
+    /// The picture inside `screenRegion`.
     var screenRect: CGRect
+    /// From the TV's bottom edge to the controller body (includes the shoulder row).
     var gapRect: CGRect
+    /// Where the distant console is drawn.
+    var consoleRect: CGRect
     var controllerRegion: CGRect
     var bodyRect: CGRect
     /// Controller scale, points per model metre.
     var pointsPerMeter: CGFloat
 
+    /// Projected width ÷ height of the console at the game camera's angle.
+    static let consoleAspect: CGFloat = 2.55
+
+    /// `shoulderClearance`: `PS2ControllerModel.shoulderClearance` (model metres).
     init(size: CGSize, topInset: CGFloat, bottomInset: CGFloat, screenAspect: CGFloat,
-         footprint: PS2ControllerModel.Footprint) {
+         footprint: PS2ControllerModel.Footprint, shoulderClearance: CGFloat) {
         self.size = size
         let width = max(1, size.width)
-        let available = max(1, size.height - topInset - bottomInset)
-        let margin = max(8, width * 0.02)
-        let fullScreenHeight = width / screenAspect
-        let fullPPM = (width - 2 * margin) / CGFloat(footprint.width)
-        let controllerDepth = CGFloat(footprint.depth) + PS2ControllerMetrics.shoulderRowDepth
-        let fullControllerHeight = controllerDepth * fullPPM
-        let minimumGap = max(110, available * 0.17)
-        let scale = min(1, max(0.2, (available - minimumGap) / (fullScreenHeight + fullControllerHeight)))
+        let half = (max(2, size.height) / 2).rounded()
+        screenRegion = CGRect(x: 0, y: topInset, width: width, height: max(1, half - topInset))
+        let pictureHeight = min(screenRegion.width / screenAspect, screenRegion.height).rounded(.down)
+        let pictureWidth = min(width, (pictureHeight * screenAspect).rounded())
+        screenRect = CGRect(x: ((width - pictureWidth) / 2).rounded(),
+                            y: (screenRegion.midY - pictureHeight / 2).rounded(),
+                            width: pictureWidth, height: pictureHeight)
 
-        let screenHeight = (fullScreenHeight * scale).rounded()
-        let screenWidth = (screenHeight * screenAspect).rounded()
-        screenRect = CGRect(x: ((width - screenWidth) / 2).rounded(), y: topInset,
-                            width: screenWidth, height: screenHeight)
-        pointsPerMeter = fullPPM * scale
+        let margin = max(8, width * 0.02)
+        let bottom = size.height - bottomInset
+        let controllerDepth = CGFloat(footprint.depth) + PS2ControllerMetrics.shoulderRowDepth
+        pointsPerMeter = max(1, min((width - 2 * margin) / CGFloat(footprint.width),
+                                    (bottom - half) / controllerDepth))
         let bodySize = CGSize(width: CGFloat(footprint.width) * pointsPerMeter,
                               height: CGFloat(footprint.depth) * pointsPerMeter)
-        bodyRect = CGRect(x: (width - bodySize.width) / 2, y: size.height - bottomInset - bodySize.height,
+        bodyRect = CGRect(x: (width - bodySize.width) / 2, y: bottom - bodySize.height,
                           width: bodySize.width, height: bodySize.height)
-        let rowHeight = PS2ControllerMetrics.shoulderRowDepth * pointsPerMeter
-        controllerRegion = CGRect(x: 0, y: bodyRect.minY - rowHeight, width: width,
-                                  height: size.height - (bodyRect.minY - rowHeight))
-        gapRect = CGRect(x: 0, y: screenRect.maxY, width: width,
-                         height: max(0, controllerRegion.minY - screenRect.maxY))
+        let rowTop = bodyRect.minY - PS2ControllerMetrics.shoulderRowDepth * pointsPerMeter
+        controllerRegion = CGRect(x: 0, y: rowTop, width: width, height: size.height - rowTop)
+        gapRect = CGRect(x: 0, y: screenRegion.maxY, width: width,
+                         height: max(0, bodyRect.minY - screenRegion.maxY))
+
+        // Either wholly above the shoulder row, or down between the shoulder buttons (narrower),
+        // whichever is larger; leave room below it for the cable to reach the controller.
+        let pad: CGFloat = 6
+        let k = Self.consoleAspect
+        let maxWidth = min(width * 0.42, 300)
+        let above = max(0, rowTop - gapRect.minY - 2 * pad)
+        let aboveWidth = min(above * k, maxWidth)
+        let cableRoom = max(16, gapRect.height * 0.28)
+        let band = 2 * shoulderClearance * pointsPerMeter - 8
+        let inBandWidth = min(band, max(0, gapRect.height - pad - cableRoom) * k, maxWidth)
+        let consoleWidth = max(90, aboveWidth, inBandWidth).rounded()
+        let consoleHeight = (consoleWidth / k).rounded()
+        let centerY = aboveWidth >= inBandWidth
+            ? gapRect.minY + (rowTop - gapRect.minY) / 2
+            : gapRect.minY + pad + consoleHeight / 2
+        consoleRect = CGRect(x: ((width - consoleWidth) / 2).rounded(), y: (centerY - consoleHeight / 2).rounded(),
+                             width: consoleWidth, height: consoleHeight)
     }
 
-    /// Where the controller-side cable stub ends, and the cable's on-screen radius there.
+    /// The centre of the controller boot's end face (where the live cable comes out), and the
+    /// cable's on-screen radius there.
     func cableStart(footprint: PS2ControllerModel.Footprint) -> (point: CGPoint, radius: CGFloat) {
         let center = footprint.center
         let exit = PS2ControllerMetrics.cableExit
         let point = CGPoint(x: bodyRect.midX + CGFloat(exit.x - center.x) * pointsPerMeter,
-                            y: bodyRect.midY + CGFloat(PS2ControllerMetrics.cableStubEndZ - center.y) * pointsPerMeter)
+                            y: bodyRect.midY + CGFloat(PS2ControllerMetrics.cableBootEndZ - center.y) * pointsPerMeter)
         return (point, CGFloat(PS2ControllerMetrics.cableRadius) * pointsPerMeter)
     }
 }
@@ -97,6 +126,8 @@ final class PS2RuntimeModel: ObservableObject {
     private(set) var trayDiscAnchor: SCNNode?
     private(set) var portNode: SCNNode?
     private(set) var cableNode = SCNNode()
+    /// Child of `cableNode`, so it fades out with the cable.
+    private let cableShadow = SCNNode()
     private(set) var plugNode: SCNNode?
     /// The live console SCNView (full PS2GameView bounds).
     weak var consoleView: SCNView?
@@ -198,6 +229,9 @@ final class PS2RuntimeModel: ObservableObject {
             plugNode = plug
         }
         cableNode.name = "DUO_PS2_CABLE"
+        cableShadow.renderingOrder = -1
+        cableShadow.castsShadow = false
+        cableNode.addChildNode(cableShadow)
         root.addChildNode(cableNode)
         setPowerLight(.on)
         setEjectLight(false)
@@ -385,33 +419,31 @@ final class PS2RuntimeModel: ObservableObject {
 
     func updateConsoleViewport(size: CGSize, layout: PS2GameLayout) {
         guard size.width > 0, size.height > 0 else { return }
-        let key = [size.width, size.height, layout.gapRect.minY, layout.gapRect.height,
+        let target = layout.consoleRect
+        let key = [size.width, size.height, target.minX, target.minY, target.width,
                    layout.bodyRect.minY, layout.bodyRect.width]
         guard key != viewportKey else { return }
         viewportKey = key
         viewSize = size
         screenRect = layout.screenRect
-        let gap = layout.gapRect
         let f = size.height / 2 / tan(Self.fieldOfView / 2 * .pi / 180)
         focalLength = f
-        // Console size in the gap: a fraction of the width, bounded by the gap height.
-        let consoleWidth = max(60, min(gap.width * 0.40, gap.height * 1.45, 360))
-        let distance = Float(0.301 * f / consoleWidth)
-        cameraDistance = distance
-        let target = SIMD3<Float>(0.0005, 0.039, 0)
-        let elevation: Float = 13 * .pi / 180
-        let azimuth: Float = -16 * .pi / 180
-        let direction = SIMD3<Float>(sin(azimuth) * cos(elevation), sin(elevation), cos(azimuth) * cos(elevation))
-        let anchor = CGPoint(x: gap.midX, y: gap.minY + gap.height * 0.44)
         SCNTransaction.begin()
         SCNTransaction.disableActions = true
-        consoleCameraNode.simdPosition = target + direction * distance
-        consoleCameraNode.simdLook(at: target, up: SIMD3(0, 1, 0), localFront: SIMD3(0, 0, -1))
-        // Turn the camera so the console lands at the gap's anchor instead of the view centre.
-        let yaw = Float(atan((anchor.x - size.width / 2) / f))
-        let pitch = Float(atan((size.height / 2 - anchor.y) / f))
-        consoleCameraNode.simdLocalRotate(by: simd_quatf(angle: yaw, axis: SIMD3(0, 1, 0)))
-        consoleCameraNode.simdLocalRotate(by: simd_quatf(angle: -pitch, axis: SIMD3(1, 0, 0)))
+        // Aim at the console's centre, then correct once so its projected bounds land on
+        // `layout.consoleRect` (perspective makes the two differ slightly).
+        var width = target.width
+        var anchor = CGPoint(x: target.midX, y: target.midY)
+        for _ in 0..<2 {
+            placeCamera(consoleWidth: width, anchor: anchor, size: size)
+            let rect = projectedConsoleRect()
+            guard rect.width > 1 else { break }
+            width *= target.width / rect.width
+            anchor.x += target.midX - rect.midX
+            anchor.y += target.midY - rect.midY
+        }
+        placeCamera(consoleWidth: width, anchor: anchor, size: size)
+        let distance = cameraDistance
         consoleScene.fogStartDistance = CGFloat(distance * 0.35)
         consoleScene.fogEndDistance = CGFloat(distance * 3.2)
         let glowSize = CGFloat(10 * distance) / f
@@ -423,6 +455,24 @@ final class PS2RuntimeModel: ObservableObject {
         consoleScreenRect = projectedConsoleRect()
         rebuildCable(layout: layout)
         renderRequest?(0.1)
+    }
+
+    /// Camera at the fixed viewing angle, at the distance where the console is `consoleWidth`
+    /// points wide, turned so the console's centre lands on `anchor`.
+    private func placeCamera(consoleWidth: CGFloat, anchor: CGPoint, size: CGSize) {
+        let f = focalLength
+        let distance = Float(0.301 * f / max(20, consoleWidth))
+        cameraDistance = distance
+        let target = SIMD3<Float>(0.0005, 0.039, 0)
+        let elevation: Float = 13 * .pi / 180
+        let azimuth: Float = -16 * .pi / 180
+        let direction = SIMD3<Float>(sin(azimuth) * cos(elevation), sin(elevation), cos(azimuth) * cos(elevation))
+        consoleCameraNode.simdPosition = target + direction * distance
+        consoleCameraNode.simdLook(at: target, up: SIMD3(0, 1, 0), localFront: SIMD3(0, 0, -1))
+        let yaw = Float(atan((anchor.x - size.width / 2) / f))
+        let pitch = Float(atan((size.height / 2 - anchor.y) / f))
+        consoleCameraNode.simdLocalRotate(by: simd_quatf(angle: yaw, axis: SIMD3(0, 1, 0)))
+        consoleCameraNode.simdLocalRotate(by: simd_quatf(angle: -pitch, axis: SIMD3(1, 0, 0)))
     }
 
     private func projectedConsoleRect() -> CGRect {
@@ -438,75 +488,148 @@ final class PS2RuntimeModel: ObservableObject {
 
     // MARK: Cable
 
-    /// A sagging tube from the controller's cable stub to the plug in PORT_CTRL_1. The near end
-    /// is placed on the camera ray through the stub's screen point at the depth where a 4 mm
-    /// cable has the stub's on-screen width, so both views meet seamlessly.
+    /// The live cable: a 4 mm tube in the console scene from the controller's boot to the plug in
+    /// PORT_CTRL_1. Near end: on the camera ray through the boot's end face, at the depth where the
+    /// tube has the boot view's cable width, heading away from the viewer (straight up on screen),
+    /// so the orthographic controller and the perspective scene meet seamlessly. From the hand it
+    /// sags onto the floor in front of the console (with a soft contact shadow), runs back along
+    /// it and rises into the plug. Constant radius in 3D: it thins and fogs with distance.
     private func rebuildCable(layout: PS2GameLayout) {
         guard let port = portNode else { return }
         let start = layout.cableStart(footprint: controller.footprint)
         guard start.radius > 0 else { return }
-        let radius = PS2ControllerMetrics.cableRadius
-        let nearDepth = radius * Float(focalLength / start.radius)
-        let p0 = unproject(start.point, depth: nearDepth)
-        let up = consoleCameraNode.simdConvertVector(simd_normalize(SIMD3<Float>(0, 1, -0.8)), to: nil)
+        let r = PS2ControllerMetrics.cableRadius
+        let nearDepth = r * Float(focalLength / start.radius)
+        let eye = consoleCameraNode.simdWorldPosition
+        /// Depth at which the ray through `point` meets the plane `y = height` (nil above the horizon).
+        func floorDepth(_ point: CGPoint, height: Float) -> Float? {
+            let direction = unproject(point, depth: 1) - eye
+            guard direction.y < -1e-5 else { return nil }
+            return (height - eye.y) / direction.y
+        }
+
+        // Landing: on the floor just in front of the port, visible below the console's base.
+        let s0 = start.point
         let portPosition = port.simdWorldPosition
         let plugRear = portPosition + SIMD3(0, 0, 0.048)
-        let drop = plugRear + SIMD3(0, -0.02, 0.045)
-        // Shaped on screen: up from the stub, a gentle S across the gap, onto the floor just
-        // in front of the console, then up into the plug. Depth grows monotonically, so the
-        // tube thins with distance.
-        let gap = layout.gapRect
-        let floorY = min(gap.maxY - 6, consoleScreenRect.maxY + max(8, (gap.maxY - consoleScreenRect.maxY) * 0.4))
-        var plugFloor = SIMD3<Float>(portPosition.x + 0.025, 0.004, portPosition.z + 0.15)
-        var floorProjection = project(plugFloor)
-        if floorProjection.point.y > floorY {
-            plugFloor = unproject(CGPoint(x: floorProjection.point.x, y: floorY), depth: floorProjection.depth)
-            floorProjection = project(plugFloor)
+        var landing = SIMD3<Float>(portPosition.x + 0.012, r, portPosition.z + 0.075)
+        var landingPoint = project(landing).point
+        let highest = consoleScreenRect.maxY + 3, lowest = s0.y - 12
+        let clampedY = min(max(landingPoint.y, highest), max(highest, lowest))
+        if clampedY != landingPoint.y, let depth = floorDepth(CGPoint(x: landingPoint.x, y: clampedY), height: r) {
+            landing = unproject(CGPoint(x: landingPoint.x, y: clampedY), depth: depth)
+            landingPoint = project(landing).point
         }
-        let s0 = start.point
-        let farDepth = floorProjection.depth
-        let rise = CGPoint(x: s0.x, y: s0.y - (s0.y - floorY) * 0.4)
-        let bend = CGPoint(x: s0.x + (floorProjection.point.x - s0.x) * 0.3 + gap.width * 0.07,
-                           y: floorY + (s0.y - floorY) * 0.18)
-        let points = [p0 - up * 0.006, p0,
-                      unproject(rise, depth: nearDepth * 1.2),
-                      unproject(bend, depth: nearDepth + (farDepth - nearDepth) * 0.45),
-                      plugFloor, drop, plugRear]
-        let path = Self.catmullRom(points, samplesPerSegment: 14)
-        let geometry = Self.tube(path, radius: radius, sides: 12)
-        let material = SCNMaterial()
-        material.lightingModel = .physicallyBased
-        material.diffuse.contents = UIColor(red: 0.12, green: 0.12, blue: 0.13, alpha: 1)
-        material.roughness.contents = 0.38
-        material.metalness.contents = 0.0
-        geometry.materials = [material]
+        let landingDepth = project(landing).depth
+
+        // Hand → floor on screen: straight up out of the boot while the cable is still thick, then
+        // curving over to the landing, heading for the plug, once it has thinned (one cubic
+        // Hermite arc). Depth follows the screen length with 1/depth linear (as for a cable lying
+        // straight back in depth), so the width shrinks evenly from the boot's scale to the
+        // console's; the cable is kept on or above the floor.
+        let plugPoint = project(plugRear).point
+        func unit(_ v: CGPoint) -> CGPoint { let l = max(1e-6, hypot(v.x, v.y)); return CGPoint(x: v.x / l, y: v.y / l) }
+        let towardPlug = unit(CGPoint(x: plugPoint.x - landingPoint.x, y: min(-6, plugPoint.y - landingPoint.y)))
+        let chord = hypot(landingPoint.x - s0.x, landingPoint.y - s0.y)
+        let m0 = CGPoint(x: 0, y: -1.25 * chord)
+        let m1 = CGPoint(x: towardPlug.x * 0.7 * chord, y: towardPlug.y * 0.7 * chord)
+        var screen: [CGPoint] = []
+        var lengths: [CGFloat] = [0]
+        for i in 0...64 {
+            let t = CGFloat(i) / 64, t2 = t * t, t3 = t2 * t
+            let a = 2 * t3 - 3 * t2 + 1, b = t3 - 2 * t2 + t, c = -2 * t3 + 3 * t2, d = t3 - t2
+            let point = CGPoint(x: a * s0.x + b * m0.x + c * landingPoint.x + d * m1.x,
+                                y: a * s0.y + b * m0.y + c * landingPoint.y + d * m1.y)
+            if let last = screen.last { lengths.append(lengths[lengths.count - 1] + hypot(point.x - last.x, point.y - last.y)) }
+            screen.append(point)
+        }
+        let total = max(1, lengths[lengths.count - 1])
+        var path: [SIMD3<Float>] = []
+        for (point, length) in zip(screen, lengths) {
+            let u = Float(length / total)
+            var depth = 1 / (1 / nearDepth + (1 / landingDepth - 1 / nearDepth) * u)
+            if let floor = floorDepth(point, height: r) {
+                // Smooth minimum: the cable settles onto the floor instead of creasing into it.
+                let k = 0.02 * landingDepth
+                depth = -k * log(exp(-depth / k) + exp(-floor / k))
+            }
+            path.append(unproject(point, depth: depth))
+        }
+        // Hidden under the boot: continue a few millimetres back so the open end never shows.
+        if path.count > 1 {
+            path.insert(path[0] - simd_normalize(path[1] - path[0]) * 0.006, at: 0)
+        }
+
+        // Floor → plug: a Hermite curve leaving the landing in the same direction and entering
+        // the plug along −Z, kept on or above the floor.
+        let p0 = path[path.count - 1]
+        let incoming = simd_normalize(p0 - path[path.count - 2])
+        let span = simd_distance(p0, plugRear)
+        let t0 = incoming * span * 1.1
+        let t1 = SIMD3<Float>(0, 0, -1) * span * 1.3
+        for i in 1...24 {
+            let t = Float(i) / 24
+            let t2 = t * t, t3 = t2 * t
+            var point = (2 * t3 - 3 * t2 + 1) * p0 + (t3 - 2 * t2 + t) * t0
+                + (-2 * t3 + 3 * t2) * plugRear + (t3 - t2) * t1
+            point.y = max(point.y, r)
+            path.append(point)
+        }
+        let geometry = Self.tube(path, radius: r, sides: 16)
+        geometry.materials = [PS2ControllerMetrics.cableMaterial()]
         cableNode.geometry = geometry
+        cableShadow.geometry = Self.contactShadow(path, cableRadius: r)
     }
 
-    static func catmullRom(_ points: [SIMD3<Float>], samplesPerSegment: Int) -> [SIMD3<Float>] {
-        guard points.count > 2 else { return points }
-        let extended = [2 * points[0] - points[1]] + points + [2 * points[points.count - 1] - points[points.count - 2]]
-        var result: [SIMD3<Float>] = []
-        for i in 0..<(points.count - 1) {
-            let p0 = extended[i], p1 = extended[i + 1], p2 = extended[i + 2], p3 = extended[i + 3]
-            // Centripetal parameterisation avoids loops on uneven spacing.
-            let t0: Float = 0
-            let t1 = t0 + max(1e-4, sqrt(simd_distance(p0, p1)))
-            let t2 = t1 + max(1e-4, sqrt(simd_distance(p1, p2)))
-            let t3 = t2 + max(1e-4, sqrt(simd_distance(p2, p3)))
-            for s in 0..<samplesPerSegment {
-                let t = t1 + (t2 - t1) * Float(s) / Float(samplesPerSegment)
-                let a1 = (t1 - t) / (t1 - t0) * p0 + (t - t0) / (t1 - t0) * p1
-                let a2 = (t2 - t) / (t2 - t1) * p1 + (t - t1) / (t2 - t1) * p2
-                let a3 = (t3 - t) / (t3 - t2) * p2 + (t - t2) / (t3 - t2) * p3
-                let b1 = (t2 - t) / (t2 - t0) * a1 + (t - t0) / (t2 - t0) * a2
-                let b2 = (t3 - t) / (t3 - t1) * a2 + (t - t1) / (t3 - t1) * a3
-                result.append((t2 - t) / (t2 - t1) * b1 + (t - t1) / (t2 - t1) * b2)
+    /// A soft dark ribbon on the floor under the parts of `path` that rest on or near it.
+    private static func contactShadow(_ path: [SIMD3<Float>], cableRadius r: Float) -> SCNGeometry? {
+        var vertices: [SCNVector3] = []
+        var coordinates: [CGPoint] = []
+        var indices: [UInt32] = []
+        let halfWidth: Float = r * 2.4
+        for (i, point) in path.enumerated() {
+            let ahead = path[min(path.count - 1, i + 1)], behind = path[max(0, i - 1)]
+            var tangent = SIMD3<Float>(ahead.x - behind.x, 0, ahead.z - behind.z)
+            guard simd_length(tangent) > 1e-6 else { continue }
+            tangent = simd_normalize(tangent)
+            let side = SIMD3<Float>(-tangent.z, 0, tangent.x) * halfWidth
+            // v: 0 = resting on the floor … 1 = 12 mm above it (no shadow).
+            let v = CGFloat(min(1, max(0, (point.y - r) / 0.012)))
+            let base = SIMD3<Float>(point.x, 0.0006, point.z)
+            let count = UInt32(vertices.count)
+            vertices += [SCNVector3(base - side), SCNVector3(base + side)]
+            coordinates += [CGPoint(x: 0, y: v), CGPoint(x: 1, y: v)]
+            if count >= 2 { indices += [count - 2, count, count - 1, count - 1, count, count + 1] }
+        }
+        guard !indices.isEmpty else { return nil }
+        let geometry = SCNGeometry(sources: [SCNGeometrySource(vertices: vertices),
+                                             SCNGeometrySource(textureCoordinates: coordinates)],
+                                   elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
+        let material = SCNMaterial()
+        material.lightingModel = .constant
+        material.diffuse.contents = shadowTexture
+        material.writesToDepthBuffer = false
+        material.isDoubleSided = true
+        material.blendMode = .alpha
+        geometry.materials = [material]
+        return geometry
+    }
+
+    /// Across (u): soft falloff from the cable's centre line; down (v): fades with height.
+    private static let shadowTexture: UIImage = {
+        let size = CGSize(width: 64, height: 32)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            for y in 0..<Int(size.height) {
+                let contact = 1 - CGFloat(y) / (size.height - 1)
+                for x in 0..<Int(size.width) {
+                    let across = abs(CGFloat(x) / (size.width - 1) * 2 - 1)
+                    let alpha = 0.62 * pow(contact, 1.6) * pow(max(0, 1 - across * across), 1.8)
+                    UIColor(white: 0, alpha: alpha).setFill()
+                    context.fill(CGRect(x: x, y: y, width: 1, height: 1))
+                }
             }
         }
-        result.append(points[points.count - 1])
-        return result
-    }
+    }()
 
     static func tube(_ path: [SIMD3<Float>], radius: Float, sides: Int) -> SCNGeometry {
         guard path.count > 1 else { return SCNGeometry() }
@@ -617,6 +740,7 @@ final class PS2RuntimeModel: ObservableObject {
         // Screen position and log-depth are interpolated, so the disc grows at an even rate.
         let s0 = SIMD2(p0.x / d0, p0.y / d0), s1 = SIMD2(p1.x / d1, p1.y / d1)
         let liftDuration = 0.28, flightDuration = 0.95
+        PS2Feedback.shared.playDiscLift()
         renderRequest?(liftDuration + flightDuration + 0.3)
         exitAnimation = PS2FrameAnimation(duration: liftDuration + flightDuration, update: { [weak self] elapsed in
             guard let self else { return }
@@ -705,6 +829,30 @@ final class PS2RuntimeModel: ObservableObject {
                                rotation: rotation)
     }
 }
+
+#if DEBUG
+extension PS2RuntimeModel {
+    /// `-ps2-hittest-selftest`: what a touch on the distant console would reach.
+    func logConsoleHitTest(title: String) {
+        guard let view = consoleView, let window = view.window else {
+            NSLog("DUO_PS2_HITTEST_FAIL game=%@ no console view in a window", title)
+            return
+        }
+        let rect = consoleScreenRect
+        let point = view.convert(CGPoint(x: rect.midX, y: rect.midY), to: nil)
+        var chain: [String] = []
+        var hit = window.hitTest(point, with: nil)
+        let reachesConsole = hit === view
+        while let current = hit, chain.count < 8 {
+            chain.append(String(describing: type(of: current)).prefix(60).description)
+            hit = current.superview
+        }
+        NSLog("DUO_PS2_HITTEST_%@ game=%@ point=%@ consoleRect=%@ chain=%@", reachesConsole ? "PASS" : "FAIL",
+              title, NSCoder.string(for: point), NSCoder.string(for: view.convert(rect, to: nil)),
+              chain.joined(separator: " < "))
+    }
+}
+#endif
 
 /// The flying exit disc in screen terms, so an orthographic scene can draw it identically.
 struct PS2ExitDiscPose {
@@ -955,6 +1103,9 @@ private struct PS2ScreenView: View {
             }
         }
         .clipped()
+        // Display only. `clipped()` does not clip hit-testing: the scaled-to-fill cover backdrop
+        // would otherwise claim touches far below this frame, over the console's long-press.
+        .allowsHitTesting(false)
     }
 
     private var placeholder: some View {
@@ -1067,13 +1218,22 @@ struct PS2GameView: View {
                 let bottom = DuoOrientation.isDuoDevice ? 4 : max(4, insets.bottom * 0.4)
                 let layout = PS2GameLayout(size: size, topInset: top, bottomInset: bottom,
                                            screenAspect: model.screenAspect,
-                                           footprint: model.controller.footprint)
+                                           footprint: model.controller.footprint,
+                                           shoulderClearance: model.controller.shoulderClearance)
                 let region = layout.controllerRegion
                 ZStack {
                     PS2ConsoleSceneView(model: model, layout: layout, controlsLocked: model.controlsLocked,
                                         onLongPress: onExitRequested)
                         .frame(width: size.width, height: size.height)
                         .position(x: size.width / 2, y: size.height / 2)
+
+                    // The TV's letterbox around the picture.
+                    Color.black
+                        .frame(width: layout.screenRegion.width, height: layout.screenRegion.height)
+                        .position(x: layout.screenRegion.midX, y: layout.screenRegion.midY)
+                        .opacity(model.foregroundHidden ? 0 : 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
 
                     PS2ScreenView(feed: model.screenFeed, title: title, cover: cover)
                         .ps2CRTShutdown(model.crt)
@@ -1106,6 +1266,16 @@ struct PS2GameView: View {
         .onAppear {
             PS2RuntimeModel.active = model
             model.seatDisc(for: game)
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-ps2-hittest-selftest") {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1))
+                    model.logConsoleHitTest(title: title)
+                    try? await Task.sleep(for: .seconds(0.3))
+                    onExitRequested()
+                }
+            }
+            #endif
         }
         .onDisappear {
             if PS2RuntimeModel.active === model { PS2RuntimeModel.active = nil }

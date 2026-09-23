@@ -296,6 +296,9 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             pan.delegate = self
             v.addGestureRecognizer(pan)
             let hold = UILongPressGestureRecognizer(target: self, action: #selector(longPress(_:)))
+            // Import is a deliberate still hold on idle Cover Flow; any drift belongs to the pan.
+            hold.allowableMovement = 6
+            hold.delegate = self
             v.addGestureRecognizer(hold)
             let tap = UITapGestureRecognizer(target: self, action: #selector(tapPS2Case(_:)))
             v.addGestureRecognizer(tap)
@@ -386,6 +389,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
                 } else if arguments.contains("-cartridge-autoplay") {
                     _ = self.accessibleInsert()
                 }
+                self.runPS2HitTestSelfTestIfRequested()
                 #endif
                 self.layout()
             }
@@ -617,6 +621,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             return t * t * (3 - 2 * t)
         }
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            if recognizer is UILongPressGestureRecognizer { return mode == .idle }
             guard mode == .idle || mode == .caseOpen, !cards.isEmpty, owner.games.indices.contains(selection) else { return false }
             switch owner.games[selection].platform {
             case .ps2: return true
@@ -837,7 +842,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             let start = pull
             // A PS2 disc or card falls back into its open case instead of the shelf.
             let rest: Mode = ps2 != nil ? .caseOpen : .idle
-            if ps2 != nil { PS2Feedback.shared.stopTray() }
+            ps2?.pullReleased()
             mode = .returning
             animate(duration: 0.28, update: { t in self.pull = start * (1 - t); self.layout() },
                 completion: { self.mode = rest; self.pull = 0; self.layout() })
