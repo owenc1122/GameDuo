@@ -17,3 +17,6 @@ __pycache__/
 /build/
 !/tools/
 tools/ps2_tests/.build*/
+!/work/
+/work/*
+!/work/package_store_cores.py
