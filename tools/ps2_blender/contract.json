@@ -1,0 +1,296 @@
+{
+ "tolerance_mm": 0.5,
+ "assets": {
+  "PS2-Console": {
+   "file": "PS2_Model/exports/PS2-Console.usdz",
+   "root": "PS2_CONSOLE",
+   "size_mm": [
+    301,
+    78,
+    182
+   ],
+   "max_tris": 60000,
+   "nodes": [
+    "DISC_TRAY",
+    "TRAY_DISC_ANCHOR",
+    "BTN_RESET",
+    "BTN_EJECT",
+    "LED_POWER",
+    "LED_EJECT",
+    "PORT_CTRL_1",
+    "PORT_CTRL_2",
+    "SLOT_MC_1",
+    "SLOT_MC_2",
+    "TRADEMARK_PRINTS"
+   ],
+   "motions": [
+    {
+     "node": "DISC_TRAY",
+     "axis": "loc_z",
+     "range_m": [
+      0,
+      0.0
+     ]
+    },
+    {
+     "node": "BTN_RESET",
+     "axis": "loc_z",
+     "range_m": [
+      0,
+      -0.001
+     ]
+    },
+    {
+     "node": "BTN_EJECT",
+     "axis": "loc_z",
+     "range_m": [
+      0,
+      -0.001
+     ]
+    }
+   ]
+  },
+  "PS2-MemoryCard": {
+   "file": "PS2_Model/exports/PS2-MemoryCard.usdz",
+   "root": "PS2_MEMORY_CARD",
+   "size_mm": [
+    42,
+    7.5,
+    56.5
+   ],
+   "max_tris": 3000,
+   "nodes": [
+    "TRADEMARK_PRINTS"
+   ],
+   "motions": []
+  },
+  "PS2-DualShock2": {
+   "file": "PS2_Model/exports/PS2-DualShock2.usdz",
+   "root": "DUALSHOCK2",
+   "size_mm": [
+    157,
+    62,
+    95
+   ],
+   "size_excludes": [
+    "CABLE",
+    "CTRL_PLUG"
+   ],
+   "max_tris": 40000,
+   "nodes": [
+    "DPAD",
+    "BTN_TRIANGLE",
+    "BTN_CIRCLE",
+    "BTN_CROSS",
+    "BTN_SQUARE",
+    "L1",
+    "R1",
+    "L2",
+    "R2",
+    "STICK_L",
+    "STICK_R",
+    "BTN_SELECT",
+    "BTN_START",
+    "BTN_ANALOG",
+    "LED_ANALOG",
+    "CABLE",
+    "CTRL_PLUG",
+    "TRADEMARK_PRINTS"
+   ],
+   "motions": [
+    {
+     "node": "BTN_TRIANGLE",
+     "axis": "loc_y",
+     "range_m": [
+      -0.002,
+      0
+     ]
+    },
+    {
+     "node": "BTN_CIRCLE",
+     "axis": "loc_y",
+     "range_m": [
+      -0.002,
+      0
+     ]
+    },
+    {
+     "node": "BTN_CROSS",
+     "axis": "loc_y",
+     "range_m": [
+      -0.002,
+      0
+     ]
+    },
+    {
+     "node": "BTN_SQUARE",
+     "axis": "loc_y",
+     "range_m": [
+      -0.002,
+      0
+     ]
+    },
+    {
+     "node": "BTN_SELECT",
+     "axis": "loc_y",
+     "range_m": [
+      -0.001,
+      0
+     ]
+    },
+    {
+     "node": "BTN_START",
+     "axis": "loc_y",
+     "range_m": [
+      -0.001,
+      0
+     ]
+    },
+    {
+     "node": "BTN_ANALOG",
+     "axis": "loc_y",
+     "range_m": [
+      -0.0008,
+      0
+     ]
+    },
+    {
+     "node": "L1",
+     "axis": "loc_y",
+     "range_m": [
+      -0.002,
+      0
+     ]
+    },
+    {
+     "node": "R1",
+     "axis": "loc_y",
+     "range_m": [
+      -0.002,
+      0
+     ]
+    },
+    {
+     "node": "L2",
+     "axis": "rot_x",
+     "range_rad": [
+      -0.1396,
+      0
+     ]
+    },
+    {
+     "node": "R2",
+     "axis": "rot_x",
+     "range_rad": [
+      -0.1396,
+      0
+     ]
+    },
+    {
+     "node": "STICK_L",
+     "axis": "rot_x",
+     "range_rad": [
+      -0.4363,
+      0.4363
+     ]
+    },
+    {
+     "node": "STICK_L",
+     "axis": "rot_z",
+     "range_rad": [
+      -0.4363,
+      0.4363
+     ]
+    },
+    {
+     "node": "STICK_R",
+     "axis": "rot_x",
+     "range_rad": [
+      -0.4363,
+      0.4363
+     ]
+    },
+    {
+     "node": "STICK_R",
+     "axis": "rot_z",
+     "range_rad": [
+      -0.4363,
+      0.4363
+     ]
+    },
+    {
+     "node": "STICK_L",
+     "axis": "loc_y",
+     "range_m": [
+      -0.0008,
+      0
+     ]
+    },
+    {
+     "node": "STICK_R",
+     "axis": "loc_y",
+     "range_m": [
+      -0.0008,
+      0
+     ]
+    },
+    {
+     "node": "DPAD",
+     "axis": "rot_x",
+     "range_rad": [
+      -0.0873,
+      0.0873
+     ]
+    },
+    {
+     "node": "DPAD",
+     "axis": "rot_z",
+     "range_rad": [
+      -0.0873,
+      0.0873
+     ]
+    }
+   ]
+  },
+  "PS2-DVD": {
+   "file": "PS2_Disc_Case/exports/PS2-DVD.usdz",
+   "root": "PS2_DVD",
+   "size_mm": [
+    120,
+    1.2,
+    120
+   ],
+   "max_tris": 4000,
+   "nodes": [
+    "DISC_LABEL"
+   ],
+   "motions": []
+  },
+  "PS2-Case": {
+   "file": "PS2_Disc_Case/exports/PS2-Case.usdz",
+   "root": "PS2_CASE",
+   "size_mm": [
+    135,
+    190,
+    14
+   ],
+   "max_tris": 11000,
+   "nodes": [
+    "CASE_LID",
+    "CASE_DISC_ANCHOR",
+    "COVER_ART",
+    "TRADEMARK_PRINTS"
+   ],
+   "motions": [
+    {
+     "node": "CASE_LID",
+     "axis": "rot_y",
+     "range_rad": [
+      0,
+      3.1416
+     ]
+    }
+   ]
+  }
+ }
+}
