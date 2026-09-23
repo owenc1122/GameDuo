@@ -1463,7 +1463,11 @@ struct GameLibraryView: View {
             if let game = selectedGame {
                 VStack(spacing: 13) {
                     if scrollCueEnabled {
-                        SegmentedScrollCue(paused: stageActive || isExiting)
+                        // PS2 cases open with a tap first, so no pull-down cue; its space stays
+                        // so the title does not jump while scrolling between platforms.
+                        let tapToOpen = game.platform == .ps2
+                        SegmentedScrollCue(paused: stageActive || isExiting || tapToOpen)
+                            .opacity(tapToOpen ? 0 : 1)
                             .padding(.bottom, 1)
                     }
                     Text(game.platform.rawValue.uppercased())

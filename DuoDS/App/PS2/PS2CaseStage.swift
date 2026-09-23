@@ -119,7 +119,17 @@ final class PS2CaseStage {
         guard let disc = PS2StageAssets.dvd?.clone() else { return nil }
         disc.name = "DUO_PS2_DISC"
         applyDiscLabel(discLabelTexture(for: game), to: disc)
+        applyDiscPrintRule(to: disc, hasCover: game.icon?.cgImage != nil)
         return disc
+    }
+
+    /// Like `applyBannerRule`: a label printed from the real cover already has its own artwork,
+    /// so the model's default label prints (PS logo box, "PlayStation 2" wordmark) are hidden;
+    /// the blank title label keeps them. The hub holograms on the data side always stay.
+    nonisolated static func applyDiscPrintRule(to disc: SCNNode, hasCover: Bool) {
+        for name in ["LABEL_PS_LOGO_BOX", "LABEL_WORDMARK"] {
+            disc.childNode(withName: name, recursively: true)?.isHidden = hasCover
+        }
     }
 
     /// Real covers (downloaded or local scans) already print the top "PlayStation 2" banner, so the
