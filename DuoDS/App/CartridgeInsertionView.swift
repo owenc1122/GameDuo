@@ -60,7 +60,10 @@ struct DragCartridgeSceneView: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        enum Mode { case idle, scroll, pull, latching, returning, opening, finished, closing, ejecting }
+        /// `caseOpening` … `browsing` are PS2-only: the case opens in place, then its disc or
+        /// memory card is pulled (`pull`, `latching`, …); `browsing` = card seated, save page shown.
+        enum Mode { case idle, scroll, pull, latching, returning, opening, finished, closing, ejecting,
+                    caseOpening, caseOpen, caseClosing, browsing }
         enum MotionCurve { case smooth, decelerating }
         var owner: DragCartridgeSceneView
         weak var view: SCNView?
@@ -121,6 +124,11 @@ struct DragCartridgeSceneView: UIViewRepresentable {
         var pendingScrollSpeed: Float = 0
         var pull: Float = 0
         var opening: Float = 0
+        /// PS2: the opened case with its console (nil while every case is closed), its open
+        /// presentation 0…1, and the tray travel after the disc latched (nil = follows `pull`).
+        var ps2: PS2InsertionStage?
+        var ps2Open: Float = 0
+        var ps2Tray: Float?
         var displayLink: CADisplayLink?
         var interactionDisplayLink: CADisplayLink?
         var pendingScroll: Float?
@@ -196,6 +204,8 @@ struct DragCartridgeSceneView: UIViewRepresentable {
                 UIAccessibilityCustomAction(name: String(localized: "上一个游戏"), target: self, selector: #selector(previous)),
                 UIAccessibilityCustomAction(name: String(localized: "下一个游戏"), target: self, selector: #selector(next)),
                 UIAccessibilityCustomAction(name: String(localized: "插入当前卡带"), target: self, selector: #selector(accessibleInsert)),
+                UIAccessibilityCustomAction(name: String(localized: "打开或合上 PS2 碟盒"), target: self, selector: #selector(accessibleTogglePS2Case)),
+                UIAccessibilityCustomAction(name: String(localized: "插入 PS2 记忆卡"), target: self, selector: #selector(accessibleInsertPS2MemoryCard)),
                 UIAccessibilityCustomAction(name: String(localized: "导入游戏"), target: self, selector: #selector(importGame))
             ]
             let camera = SCNCamera()
@@ -285,6 +295,8 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             v.addGestureRecognizer(pan)
             let hold = UILongPressGestureRecognizer(target: self, action: #selector(longPress(_:)))
             v.addGestureRecognizer(hold)
+            let tap = UITapGestureRecognizer(target: self, action: #selector(tapPS2Case(_:)))
+            v.addGestureRecognizer(tap)
             NotificationCenter.default.addObserver(self, selector: #selector(interrupted),
                 name: UIApplication.willResignActiveNotification, object: nil)
             reloadIfNeeded()
@@ -404,6 +416,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             }
             ids = newIDs
             appearanceRevisions = newRevisions
+            if owner.games.contains(where: { $0.platform == .ps2 }) { PS2StageAssets.preload() }
             #if DEBUG
             let previewArguments = ProcessInfo.processInfo.arguments
             let previewTitleIndex = previewArguments.firstIndex(of: "-psp-preview-title")
@@ -450,7 +463,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             let stageY: Float = 4.05 - fullHeight * 0.10 - (cos(tilt) * 4.65 - sin(tilt) * 0.47)
             let approaching = min(pull / 0.68, 1)
             let entry = max(0, (pull - 0.68) / 0.32)
-            let active = mode == .pull || mode == .latching || (mode == .returning && pull > 0) || mode == .opening || mode == .finished || mode == .closing || mode == .ejecting
+            let active = mode == .pull || mode == .latching || (mode == .returning && pull > 0) || mode == .opening || mode == .finished || mode == .closing || mode == .ejecting || mode == .browsing
             let stageVisibility = active ? max(0, 1 - pull * 4) : 1
             stage.isHidden = stageVisibility == 0
             stageBackdrop.opacity = CGFloat(stageVisibility)
@@ -464,12 +477,19 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             keyLight.intensity = CGFloat(mix(350, 1100, 1 - stageVisibility))
             ambientLight.intensity = CGFloat(mix(100, 320, 1 - stageVisibility))
             scene.lightingEnvironment.intensity = CGFloat(0.55 * (1 - stageVisibility))
+            if owner.games.indices.contains(selection), owner.games[selection].platform == .ps2 {
+                // The black PS2 case and console wash out to grey under the handheld insertion light.
+                keyLight.intensity = CGFloat(mix(350, 620, 1 - stageVisibility))
+                ambientLight.intensity = CGFloat(mix(100, 150, 1 - stageVisibility))
+                scene.lightingEnvironment.intensity = CGFloat(0.35 * (1 - stageVisibility))
+            }
             let rise = active ? approaching : 0
             let isPSP = owner.games.indices.contains(selection) && owner.games[selection].platform == .psp
+            let isPS2 = owner.games.indices.contains(selection) && owner.games[selection].platform == .ps2
             // Fit the whole PSP, including the shoulder buttons, inside this viewport.
             let pspScale = min(Float(stageWidth / size.height) * fullHeight * 0.94 / 0.1694, 100)
             pspConsole.scale = SCNVector3(pspScale, pspScale, pspScale)
-            console.isHidden = isPSP || !active || pull <= 0
+            console.isHidden = isPSP || isPS2 || !active || pull <= 0
             pspConsole.isHidden = !isPSP || !active || pull <= 0
             let activeConsole = isPSP ? pspConsole : console
             activeConsole.position = SCNVector3(0, mix(-fullHeight, stageY, rise) * (1 - opening), 0)
@@ -514,7 +534,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
                 let fadedDuringInsertion = active && index != selection && pull >= 0.17
                 card.isHidden = outsideLinearViewport || fadedDuringInsertion
                 if card.isHidden { continue }
-                if index == selection && active {
+                if index == selection && active && !isPS2 {
                     let pspDiscVisibility = isPSP ? 1 - smoothstep(0.12, 0.52, opening) : 1
                     card.opacity = CGFloat(pspDiscVisibility)
                     // The shelf is 30% smaller; in the drive use the physical disc/bay ratio.
@@ -572,6 +592,18 @@ struct DragCartridgeSceneView: UIViewRepresentable {
                     #endif
                     card.opacity = active ? CGFloat(max(0, 1 - pull * 6)) : 1
                 }
+                if isPS2, let ps2 {
+                    if index == selection {
+                        ps2.layout(card: card, frame: .init(
+                            cameraY: cameraNode.position.y, shelfY: shelfY, fullHeight: fullHeight,
+                            width: Float(stageWidth / size.height) * fullHeight,
+                            open: ps2Open, pull: pull, tray: ps2Tray))
+                    } else {
+                        // Neighbours step aside while a case lies open across the stage.
+                        card.opacity *= CGFloat(1 - ps2Open)
+                        card.isHidden = card.isHidden || ps2Open >= 1
+                    }
+                }
             }
             SCNTransaction.commit()
             view.accessibilityLabel = owner.games.indices.contains(selection) ? owner.games[selection].title : String(localized: "游戏卡带")
@@ -583,8 +615,12 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             return t * t * (3 - 2 * t)
         }
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
-            guard mode == .idle, !cards.isEmpty, owner.games.indices.contains(selection) else { return false }
-            return owner.games[selection].platform == .psp ? pspLid != nil : lid != nil
+            guard mode == .idle || mode == .caseOpen, !cards.isEmpty, owner.games.indices.contains(selection) else { return false }
+            switch owner.games[selection].platform {
+            case .ps2: return true
+            case .psp: return mode == .idle && pspLid != nil
+            default: return mode == .idle && lid != nil
+            }
         }
 
         /// The cartridge is deliberately rendered smaller than a comfortable
@@ -626,7 +662,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
                 pendingPull = nil
                 CartridgeFeedback.shared.prepare()
             case .changed:
-                if mode == .idle {
+                if mode == .idle || mode == .caseOpen {
                     let horizontalTravel = abs(delta.x)
                     let verticalTravel = abs(delta.y)
                     // Wait for a few points of travel before locking the axis.
@@ -635,6 +671,8 @@ struct DragCartridgeSceneView: UIViewRepresentable {
                     if owner.allowsSelection,
                        horizontalTravel >= 5,
                        horizontalTravel >= verticalTravel * 0.72 {
+                        // An open PS2 case snaps shut first, then the carousel moves on.
+                        if mode == .caseOpen { closePS2Case(thenStep: delta.x < 0 ? 1 : -1); return }
                         mode = .scroll
                         scrollStart = scroll
                         startInteractionDisplayLink()
@@ -643,6 +681,11 @@ struct DragCartridgeSceneView: UIViewRepresentable {
                               verticalTravel > horizontalTravel * 1.15,
                               (pointHitsSelectedCard(gestureStartPoint, in: view) ||
                                isInsideExpandedPullRegion(gestureStartPoint, in: view)) {
+                        if owner.games[selection].platform == .ps2 {
+                            guard beginPS2Pull(from: gestureStartPoint, in: view) else { return }
+                            startInteractionDisplayLink()
+                            return
+                        }
                         mode = .pull
                         startInteractionDisplayLink()
                     } else {
@@ -790,9 +833,12 @@ struct DragCartridgeSceneView: UIViewRepresentable {
 
         func returnToShelf() {
             let start = pull
+            // A PS2 disc or card falls back into its open case instead of the shelf.
+            let rest: Mode = ps2 != nil ? .caseOpen : .idle
+            if ps2 != nil { PS2Feedback.shared.stopTray() }
             mode = .returning
             animate(duration: 0.28, update: { t in self.pull = start * (1 - t); self.layout() },
-                completion: { self.mode = .idle; self.pull = 0; self.layout() })
+                completion: { self.mode = rest; self.pull = 0; self.layout() })
         }
 
         func snapIntoLatch() {
@@ -807,6 +853,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
 
         func completeLatch() {
             guard mode == .latching, owner.games.indices.contains(selection) else { return }
+            if ps2 != nil { completePS2Latch(); return }
             let insertedGame = owner.games[selection]
             let isTutorialCard = insertedGame.url.scheme == "duo-tutorial"
             mode = .opening
@@ -829,6 +876,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
 
         func reverseInsertion() {
             guard mode == .finished else { return }
+            if ps2 != nil { reversePS2Insertion(); return }
             if let view, owner.games.indices.contains(selection), owner.games[selection].platform == .psp,
                let handoff = PSPShutdownHandoff.take?(view) {
                 SCNTransaction.begin()
@@ -978,6 +1026,9 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             settleSelection(to: isCircular ? wrappedIndex(selection + 1) : min(cards.count - 1, selection + 1)); return true
         }
         @objc func accessibleInsert() -> Bool {
+            if owner.games.indices.contains(selection), owner.games[selection].platform == .ps2 {
+                return accessibleInsertPS2(.disc)
+            }
             guard owner.allowsInsertion, mode == .idle, !cards.isEmpty else { return false }
             mode = .pull
             animate(duration: 0.48, update: { self.pull = $0 * 0.90; self.layout() }, completion: {

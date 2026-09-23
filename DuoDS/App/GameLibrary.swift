@@ -1970,6 +1970,7 @@ enum CartridgeSceneFactory {
             caseNode.scale = SCNVector3(scale, scale, scale)
             caseNode.position = SCNVector3(0, -0.095 * scale, 0)  // centre the 190 mm height
             applyPS2CoverInsert(ps2InsertTexture(for: game), to: caseNode)
+            PS2CaseStage.applyBannerRule(to: caseNode, hasCover: game.icon != nil)
             model.addChildNode(caseNode)
         } else {
             let box = SCNBox(width: CGFloat(0.135 * scale), height: CGFloat(0.19 * scale),

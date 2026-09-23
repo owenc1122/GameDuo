@@ -498,6 +498,12 @@ struct ContentView: View {
 
     private func beginEmulation(of game: GameLibraryItem) {
         guard activeGame == nil, !library.isImporting else { return }
+        if game.platform == .ps2 {
+            // No PS2 core yet: the game screen shows its placeholder without a running session.
+            activeGame = game
+            playStartedAt = Date()
+            return
+        }
         session.runtimeConfiguration = DuoRuntimeConfiguration(
             preferences: proStore.preferences(for: game.url),
             isPro: proEntitlement.isUnlocked,
@@ -518,7 +524,7 @@ struct ContentView: View {
         }
     }
     private func finishInsertion() {
-        guard session.isRunning && activeGame != nil else {
+        guard (session.isRunning || activeGame?.platform == .ps2) && activeGame != nil else {
             libraryGeneration = UUID()
             libraryHidden = false
             return
@@ -1416,7 +1422,9 @@ private struct EmulatorView: View {
             Color.black
                 .ignoresSafeArea()
 
-            if session.isPSP {
+            if game.platform == .ps2 {
+                PS2GameView(session: nil, title: game.title, cover: game.icon?.cgImage, onExitRequested: onExit)
+            } else if session.isPSP {
                 PSPGameView(session: session, onExit: onExit)
             } else if session.isN64 {
                 N64GameView(session: session, onExit: onExit)
@@ -1431,7 +1439,7 @@ private struct EmulatorView: View {
             } else {
                 ProgressView(String(localized: "正在启动模拟器…"))
             }
-            if session.runtimeConfiguration.isPro {
+            if session.runtimeConfiguration.isPro && game.platform != .ps2 {
                 DuoProGameOverlay(session: session, game: game, onExit: onExit)
             }
             if session.isPaused && !isExiting {
