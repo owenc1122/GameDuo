@@ -18,7 +18,8 @@ enum PS2WebSpike {
             let args = ProcessInfo.processInfo.arguments
             func value(_ key: String) -> String? { args.firstIndex(of: key).flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil } }
             if let dir = value("-webcore-play") {
-                config.setURLSchemeHandler(PlayHandler(dir: URL(fileURLWithPath: dir), disc: value("-webcore-play-disc").map(URL.init(fileURLWithPath:))), forURLScheme: scheme)
+                config.setURLSchemeHandler(PlayHandler(dir: URL(fileURLWithPath: dir), disc: value("-webcore-play-disc").map(URL.init(fileURLWithPath:)),
+                                                      host: value("-webcore-play-host").map(URL.init(fileURLWithPath:))), forURLScheme: scheme)
             } else {
                 config.setURLSchemeHandler(Handler(), forURLScheme: scheme)
             }
@@ -73,7 +74,8 @@ enum PS2WebSpike {
     private final class PlayHandler: NSObject, WKURLSchemeHandler {
         let dir: URL
         let disc: URL?
-        init(dir: URL, disc: URL?) { self.dir = dir; self.disc = disc }
+        let host: URL?
+        init(dir: URL, disc: URL?, host: URL?) { self.dir = dir; self.disc = disc; self.host = host }
 
         func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
             let url = task.request.url!
@@ -84,7 +86,11 @@ enum PS2WebSpike {
             switch url.path {
             case "/", "/index.html":
                 let size = disc.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? NSNumber }?.int64Value ?? 0
-                body = Data(PS2WebSpike.playPage.replacingOccurrences(of: "__DISC_SIZE__", with: "\(size)").utf8)
+                let args = ProcessInfo.processInfo.arguments
+                let keys = args.firstIndex(of: "-webcore-play-keys").flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil } ?? ""
+                body = Data(PS2WebSpike.playPage.replacingOccurrences(of: "__DISC_SIZE__", with: "\(size)")
+                    .replacingOccurrences(of: "__KEYS__", with: keys)
+                    .replacingOccurrences(of: "__UNLIMITED__", with: args.contains("-webcore-play-unlimited") ? "1" : "0").utf8)
                 headers["Content-Type"] = "text/html; charset=utf-8"
             case "/Play.js":
                 let polyfill = "globalThis.SharedArrayBuffer ||= new WebAssembly.Memory({initial: 0, maximum: 0, shared: true}).buffer.constructor;\n"
@@ -104,6 +110,18 @@ enum PS2WebSpike {
                         status = 206
                     }
                 }
+                headers["Content-Type"] = "application/octet-stream"
+            case "/host-manifest":
+                var files: [String] = []
+                if let host, let e = FileManager.default.enumerator(at: host, includingPropertiesForKeys: [.isRegularFileKey]) {
+                    for case let f as URL in e where (try? f.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
+                        files.append(String(f.path.dropFirst(host.path.count + 1)))
+                    }
+                }
+                body = (try? JSONSerialization.data(withJSONObject: files)) ?? Data("[]".utf8)
+                headers["Content-Type"] = "application/json"
+            case let path where path.hasPrefix("/host/"):
+                if let host { body = (try? Data(contentsOf: host.appendingPathComponent(String(path.dropFirst(6))))) ?? Data() }
                 headers["Content-Type"] = "application/octet-stream"
             default:
                 status = 404
@@ -147,10 +165,48 @@ enum PS2WebSpike {
         getFileSize() { return __DISC_SIZE__; },
         isDone() { return this.done; },
       };
+      if ('__UNLIMITED__' === '1') {
+        const dir = '/home/web_user/.local/share/Play Data Files';
+        M.FS.mkdirTree(dir);
+        M.FS.writeFile(dir + '/config.xml', '<?xml version="1.0"?><Config><Preference Name="ps2.limitframerate" Type="boolean" Value="false"/></Config>');
+        log('limit', 'off');
+      }
       M.ccall('initVm', '', [], []);
       log('initVm', 'ok');
-      if (__DISC_SIZE__ > 0) { M.bootDiscImage('disc.iso'); log('boot', 'disc'); }
-      setInterval(() => { log('fps', M.getFrames()); M.clearStats(); }, 2000);
+      const files = await (await fetch('/host-manifest')).json();
+      if (files.length) {
+        const t1 = performance.now(); let bytes = 0;
+        await Promise.all(files.map(async f => {
+          const data = new Uint8Array(await (await fetch('/host/' + f.split('/').map(encodeURIComponent).join('/'))).arrayBuffer());
+          const full = '/vfs/host/' + f; M.FS.mkdirTree(full.substring(0, full.lastIndexOf('/'))); M.FS.writeFile(full, data); bytes += data.length;
+        }));
+        log('hostLoaded', `${files.length} files ${(bytes / 1e6).toFixed(1)} MB in ${(performance.now() - t1).toFixed(0)} ms`);
+        const findHost = (dir) => {
+          for (const n of M.FS.readdir(dir)) {
+            if (n === '.' || n === '..' || dir === '/' && ['proc', 'dev', 'vfs'].includes(n)) continue;
+            const full = (dir === '/' ? '' : dir) + '/' + n;
+            if (!M.FS.isDir(M.FS.lstat(full).mode)) continue;
+            if (full.endsWith('vfs/host')) return full;
+            const r = findHost(full); if (r) return r;
+          }
+        };
+        const hostDir = findHost('/');
+        log('hostDir', hostDir);
+        if (hostDir) { M.FS.rmdir(hostDir); M.FS.symlink('/vfs/host', hostDir); }
+        const elf = files.find(f => /\\.elf$/i.test(f));
+        M.bootElf('/vfs/host/' + elf); log('boot', elf);
+      } else if (__DISC_SIZE__ > 0) { M.bootDiscImage('disc.iso'); log('boot', 'disc'); }
+      window.press = (code, ms = 150) => {
+        const c = document.getElementById('outputCanvas');
+        c.dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true }));
+        setTimeout(() => c.dispatchEvent(new KeyboardEvent('keyup', { code, key: code, bubbles: true })), ms);
+      };
+      const start = performance.now();
+      setInterval(() => { log('fps', `${((performance.now() - start) / 1000).toFixed(0)}s ${M.getFrames() / 2}`); M.clearStats(); }, 2000);
+      for (const step of '__KEYS__'.split(',').filter(Boolean)) {
+        const [at, code, hold] = step.split(':');
+        setTimeout(() => { press(code, Number(hold || 150)); log('key', `${code}@${at}`); }, Number(at));
+      }
     } catch (e) { log('error', e + ' ' + (e.stack || '')); }
     </script></body></html>
     """
