@@ -44,6 +44,9 @@ final class PS2InsertionStage {
     private let powerGlow = SCNNode()
     private let ejectGlow = SCNNode()
     private var trayEjectAnnounced = false
+    /// Slot door sound state: whether its opening was announced, and the extreme opening since.
+    private var doorAnnouncedOpen = false
+    private var doorExtreme: Float = 0
 
     static let trayTravel: Float = 0.135
     private static let consoleTilt: Float = 0.62
@@ -144,7 +147,9 @@ final class PS2InsertionStage {
         }
         tray?.simdPosition = trayRest + SIMD3(0, 0, Self.trayTravel * trayTravel)
         // The slot door must be open before the card reaches the slot (contract).
-        door?.eulerAngles.x = target == .memoryCard ? .pi / 2 * smooth(0.3, 0.62, f.pull) : 0
+        let doorOpening = target == .memoryCard ? smooth(0.3, 0.62, f.pull) : 0
+        door?.eulerAngles.x = .pi / 2 * doorOpening
+        announceDoor(doorOpening)
 
         // Disc and card: rest in the case, or travel case → above the tray / in front of the slot → seated.
         let discRest = caseStage.discRestTransform
@@ -168,6 +173,31 @@ final class PS2InsertionStage {
         } else {
             caseStage.memoryCard.simdTransform = cardRest
         }
+    }
+
+    /// The slot door clicks open as it starts to swing, and shut (reversed) once it clearly swings
+    /// back; the hysteresis keeps a jittery drag from repeating either sound.
+    private func announceDoor(_ opening: Float) {
+        if doorAnnouncedOpen {
+            doorExtreme = max(doorExtreme, opening)
+            guard opening <= 0.001 || opening < doorExtreme - 0.15 else { return }
+            doorAnnouncedOpen = false
+            doorExtreme = opening
+            PS2Feedback.shared.playSlotDoor(open: false)
+        } else {
+            doorExtreme = min(doorExtreme, opening)
+            guard opening > doorExtreme + (doorExtreme <= 0.001 ? 0.01 : 0.15) else { return }
+            doorAnnouncedOpen = true
+            doorExtreme = opening
+            PS2Feedback.shared.playSlotDoor(open: true)
+        }
+    }
+
+    /// A pull let go before the latch: the disc falls back into the case and an ejected tray
+    /// retracts with it (the card's door closes by itself through `announceDoor`).
+    func pullReleased() {
+        PS2Feedback.shared.stopTray()
+        if target == .disc, trayEjectAnnounced { PS2Feedback.shared.playTrayRetract() }
     }
 
     // MARK: Lights
@@ -367,7 +397,7 @@ extension DragCartridgeSceneView.Coordinator {
         switch ps2.target {
         case .disc:
             mode = .opening
-            CartridgeFeedback.shared.playInsertionLatch()
+            PS2Feedback.shared.playDiscLatch()
             ps2Tray = 1
             PS2Feedback.shared.playTrayRetract()
             animate(duration: reduceMotion ? 0.3 : 0.9, update: { t in
@@ -399,6 +429,8 @@ extension DragCartridgeSceneView.Coordinator {
     func withdrawPS2MemoryCard() {
         guard mode == .browsing else { return }
         mode = .returning
+        PS2Feedback.shared.prepare()
+        PS2Feedback.shared.playMemoryCardWithdraw()
         animate(duration: reduceMotion ? 0.3 : 0.8, update: { t in
             self.pull = 1 - t
             self.layout()
@@ -438,8 +470,15 @@ extension DragCartridgeSceneView.Coordinator {
             ps2.setEjectLight(false)
             self.ps2Tray = nil
             self.mode = .ejecting
+            // The disc lifts off the tray, which then follows it back in (from pull 0.7).
+            PS2Feedback.shared.playDiscLift()
+            var retracting = false
             self.animate(duration: self.reduceMotion ? 0.35 : 1.0, update: { t in
                 self.pull = 1 - t
+                if !retracting, self.pull < 0.7 {
+                    retracting = true
+                    PS2Feedback.shared.playTrayRetract()
+                }
                 self.layout()
             }, completion: {
                 self.pull = 0
@@ -449,10 +488,7 @@ extension DragCartridgeSceneView.Coordinator {
                     self.layout()
                 }, completion: {
                     PS2Feedback.shared.playCaseClose()
-                    self.finishPS2Close()
-                    self.scroll = Float(self.selection)
-                    self.layout()
-                    self.owner.onReturned()
+                    self.returnPS2ToCoverFlow()
                 })
             })
         })
@@ -524,13 +560,25 @@ extension DragCartridgeSceneView.Coordinator {
                 self.layout()
             }, completion: {
                 PS2Feedback.shared.playCaseClose()
-                self.ps2StageVisibility = nil
-                self.finishPS2Close()
-                self.scroll = Float(self.selection)
-                self.layout()
-                self.owner.onReturned()
+                self.returnPS2ToCoverFlow()
             })
         }
+    }
+
+    /// Every PS2 exit path ends here: the case is closed and Cover Flow is idle again (so a
+    /// horizontal drag scrolls and a still hold may import) before the app leaves the game.
+    private func returnPS2ToCoverFlow() {
+        ps2StageVisibility = nil
+        finishPS2Close()
+        opening = 0
+        scroll = Float(selection)
+        layout()
+        #if DEBUG
+        let idle = mode == .idle && pull == 0 && ps2Open == 0 && ps2 == nil && displayLink == nil
+        NSLog("DUO_PS2_RETURN %@ mode=%@ pull=%.2f open=%.2f selection=%d", idle ? "idle" : "NOT_IDLE",
+              String(describing: mode), pull, ps2Open, selection)
+        #endif
+        owner.onReturned()
     }
 
     // MARK: Accessibility
@@ -562,3 +610,51 @@ extension DragCartridgeSceneView.Coordinator {
         }
     }
 }
+
+#if DEBUG
+// MARK: - Self-test
+
+extension DragCartridgeSceneView.Coordinator {
+    /// `-ps2-hittest-selftest`: inserts up to three PS2 games in turn through the real insertion
+    /// path. Each game screen logs what a touch on its console reaches (`DUO_PS2_HITTEST_…`) and
+    /// exits; the next game follows once Cover Flow is idle again.
+    /// `-ps2-autoplay N` instead inserts only the N-th PS2 game and stays in it (screenshots).
+    func runPS2HitTestSelfTestIfRequested() {
+        let arguments = ProcessInfo.processInfo.arguments
+        let games = owner.games.indices.filter { owner.games[$0].platform == .ps2 }
+        if let i = arguments.firstIndex(of: "-ps2-autoplay"), arguments.indices.contains(i + 1),
+           let n = Int(arguments[i + 1]), games.indices.contains(n) {
+            settleSelection(to: games[n]) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { _ = self.accessibleInsertPS2(.disc) }
+            }
+            return
+        }
+        guard arguments.contains("-ps2-hittest-selftest") else { return }
+        runPS2HitTestStep(Array(games.prefix(3)))
+    }
+
+    private func runPS2HitTestStep(_ queue: [Int]) {
+        guard let index = queue.first else { NSLog("DUO_PS2_HITTEST_DONE"); return }
+        settleSelection(to: index) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                guard self.accessibleInsertPS2(.disc) else {
+                    NSLog("DUO_PS2_HITTEST_FAIL could not insert index=%d mode=%@", index, String(describing: self.mode))
+                    return
+                }
+                self.waitForPS2Return(sawGame: false) { self.runPS2HitTestStep(Array(queue.dropFirst())) }
+            }
+        }
+    }
+
+    private func waitForPS2Return(sawGame: Bool, then next: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let saw = sawGame || self.mode == .finished
+            guard saw, self.mode == .idle, !self.owner.isExiting else {
+                self.waitForPS2Return(sawGame: saw, then: next)
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: next)
+        }
+    }
+}
+#endif
