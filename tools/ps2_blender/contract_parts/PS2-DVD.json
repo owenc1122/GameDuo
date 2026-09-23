@@ -1,0 +1,101 @@
+{
+  "part": "PS2-DVD",
+  "model_number": "PlayStation 2 DVD-ROM game disc (NTSC-U/C, 120 mm, single-sided; SLUS/SCUS)",
+  "units": "mm",
+  "frame": "Disc lying flat, label side up (+Y), data (read) side down (-Y). Root = disc center, Y=0 at mid-thickness (label surface Y=+0.6, data surface Y=-0.6). Label 2D positions below are [u, v] in mm viewed from +Y: u = +X, v = label 'up' = -Z.",
+  "size_mm": [120.0, 1.2, 120.0],
+  "layout": {
+    "center_hole_d": 15.0,
+    "clamp_area_d": 33.0,
+    "clamp_area_inner_d": 22.0,
+    "stacking_ring_d": 37.0,
+    "label_inner_d": 24.0,
+    "label_outer_d": 117.0,
+    "first_transition_d": 16.0,
+    "clear_hub_outer_d": 41.0,
+    "mirror_band_inner_d": 41.0,
+    "mirror_band_outer_d": 44.0,
+    "info_zone_start_d": 44.0,
+    "lead_in_end_data_start_d": 48.0,
+    "data_zone_end_max_d": 116.0,
+    "info_zone_end_d": 117.0,
+    "substrate_thickness_mm": 0.6,
+    "edge_round_radius_mm": 0.2,
+    "center_hole_edge_round_mm": 0.1,
+    "stacking_ring_height_mm": 0.2,
+    "data_side_holograms": {
+      "desc": "molded 'PlayStation 2' wordmark + PS logo holograms in the clear hub band, visible from both sides",
+      "ring_inner_d": 27.0,
+      "ring_outer_d": 36.0,
+      "count": 6
+    },
+    "data_side_ps_logo_watermarks": {
+      "desc": "six faint PS logos in the reflective data area (1,3,5,7,9,11 o'clock)",
+      "center_radius_mm": 44.7,
+      "size_mm": 14.0,
+      "angles_deg_from_up_cw": [30, 90, 150, 210, 270, 330]
+    },
+    "label_elements_ntscuc": {
+      "desc": "Sony NTSC-U/C label layout (measured on SCUS 97395). Runtime label texture replaces all of this; positions only.",
+      "ps_logo_box": {"center_uv_mm": [-38.8, 0.3], "size_mm": [15.5, 15.6], "style": "white outline square, white PS family logo"},
+      "ntsc_uc_tag": {"center_uv_mm": [-39.0, -11.9], "size_mm": [15.7, 2.4]},
+      "product_code_text": {"center_uv_mm": [-39.1, -17.8], "size_mm": [14.7, 6.2], "text_example": "SLUS-XXXXX"},
+      "publisher_logo": {"center_uv_mm": [35.4, 2.2], "size_mm": [12.1, 16.7]},
+      "playstation2_wordmark": {"center_uv_mm": [0.3, -41.9], "size_mm": [27.1, 5.5], "text": "PlayStation 2"},
+      "legal_text_block": {"center_uv_mm": [0.0, 23.7], "size_mm": [88.3, 14.4], "note": "block above hub on this disc; many retail discs run the licensing text as an arc near the rim instead"},
+      "legal_text_ring_option": {"radius_mm": 55.0, "arc_deg": [200, 340], "text_height_mm": 1.4},
+      "title": {"center_uv_mm": [0.0, 39.5], "size_mm": [63.0, 8.9]}
+    }
+  },
+  "colors": {
+    "data_side": "#B9B9BE",
+    "data_side_warm_light_sample": "#A37E4E",
+    "data_side_ps2_cd_blue_alt": "#2E2470",
+    "mirror_band": "#C9CACD",
+    "hub_clear_polycarbonate": "#D8DDE0",
+    "label_default": "#FFFFFF",
+    "label_ink_black_ntscuc": "#1C1B1E",
+    "label_ink_white": "#F2F3F3"
+  },
+  "materials": {
+    "data_side": "metallic 1.0, roughness ~0.08, thin-film/anisotropic rainbow optional; under the 0.6 mm clear substrate",
+    "hub": "clear polycarbonate, IOR 1.585, transmission ~0.9 (between hole and label_inner_d, and non-metallized to 41 mm on data side)",
+    "label": "matte screen print, roughness ~0.5"
+  },
+  "grades": {
+    "size_mm": "官方",
+    "center_hole_d": "官方",
+    "clamp_area_d": "官方",
+    "clamp_area_inner_d": "官方",
+    "first_transition_d": "官方",
+    "info_zone_start_d": "官方",
+    "lead_in_end_data_start_d": "官方",
+    "data_zone_end_max_d": "官方",
+    "info_zone_end_d": "官方",
+    "substrate_thickness_mm": "官方",
+    "edge_round_radius_mm": "官方",
+    "center_hole_edge_round_mm": "官方",
+    "stacking_ring_d": "照片校准",
+    "stacking_ring_height_mm": "照片校准",
+    "label_inner_d": "交叉验证",
+    "label_outer_d": "交叉验证",
+    "clear_hub_outer_d": "照片校准",
+    "mirror_band_inner_d": "照片校准",
+    "mirror_band_outer_d": "照片校准",
+    "data_side_holograms": "照片校准",
+    "data_side_ps_logo_watermarks": "照片校准",
+    "label_elements_ntscuc": "照片校准",
+    "colors.data_side": "照片校准",
+    "colors.data_side_ps2_cd_blue_alt": "照片校准",
+    "colors.label_default": "官方",
+    "colors": "照片校准"
+  },
+  "estimated_keys": [
+    "stacking_ring_d",
+    "stacking_ring_height_mm",
+    "label_elements_ntscuc.legal_text_ring_option",
+    "colors.hub_clear_polycarbonate",
+    "materials"
+  ],
+  "notes": "Geometry from ECMA-267 3rd ed. (2001) section 10: d=120.00+-0.30, hole 15.00 (+0.15/-0), e1=1.20 (+0.30/-0.06), clamping zone 22.0-33.0, third transition area 33-44 (stacking features allowed, +0.25 max), information zone from 44.0 / data zone 48.0-116.0, info zone ends >=117.0, rim edge round <=0.2. Label printed-area inner 24 mm measured on PS2dvd.jpg (white label edge seen through the clear hub, circle fit, hole=15.0 check) and HDD Utility disc label photo; outer 117 per edocpublish full-face spec. PS2 DVD-ROM data side is SILVER; the 'blue' data side belongs to early PS2 CD-ROM titles (Wikipedia: 'earlier titles ... blue-tinted CD-ROM'); blue value provided as alternate. See PS2_Disc_Case/REFERENCE_NOTES.md."
+}
