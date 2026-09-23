@@ -14,3 +14,6 @@ xcuserdata/
 /PS2_Model/**/*.blend1
 /PS2_Disc_Case/**/*.blend1
 __pycache__/
+/build/
+!/tools/
+tools/ps2_tests/.build*/
