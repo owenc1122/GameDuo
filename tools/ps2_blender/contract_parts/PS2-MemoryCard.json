@@ -2,27 +2,215 @@
   "part": "PS2-MemoryCard",
   "model_number": "SCPH-10020 (8MB, black)",
   "units": "mm",
-  "frame": "Lying flat, label side up (+Y), connector end toward -Z. Root = center of connector end face (X=0 width center, Y=0 mid-thickness, Z=0 end face); card body extends to +Z. Label-side surface is Y=+3.75.",
-  "size_mm": [42.0, 7.5, 56.5],
+  "frame": "Lying flat, label side up (+Y), connector end toward -Z. Root = center of connector end face (X=0 width center, Y=0 bbox mid-thickness, Z=0 end face); card body extends to +Z. Body is 7.3 thick (Y -3.75..+3.55, label-side surface Y=+3.55); the embossed SONY rises 0.2 to Y=+3.75, so the overall bbox is 7.5.",
+  "size_mm": [
+    42.0,
+    7.5,
+    56.5
+  ],
   "layout": {
-    "bbox_min_mm": [-21.0, -3.75, 0.0],
-    "bbox_max_mm": [21.0, 3.75, 56.5],
+    "bbox_min_mm": [
+      -21.0,
+      -3.75,
+      0.0
+    ],
+    "bbox_max_mm": [
+      21.0,
+      3.75,
+      56.5
+    ],
     "connector_end_chamfer_mm": 2.0,
     "rear_end_corner_radius_mm": 2.5,
-    "connector_window": {"center_mm": [0.0, 0.0, 0.0], "size_mm": [28.0, 4.0], "depth_mm": 6.0, "ribs": 2, "rib_width_mm": 1.6, "rib_x_mm": [7.4, -3.0], "pin_count": 8, "pin_pitch_mm": 2.4, "keying": "asymmetric rib placement; card only fits label(triangle)-side up"},
-    "triangle_mark": {"center_mm": [0.0, 3.75, 3.0], "size_mm": [11.0, 2.7], "points_to": "-Z", "relief": "raised/recessed, body color"},
-    "holes": {"centers_mm": [[-17.5, 3.75, 3.8], [17.5, 3.75, 3.8]], "diameter_mm": 1.8},
-    "print_ps_logo": {"center_mm": [-13.9, 3.75, 8.0], "size_mm": [7.2, 5.5], "color_key": "print_blue"},
-    "print_playstation2": {"center_mm": [6.5, 3.75, 8.5], "size_mm": [22.6, 3.8], "text": "PlayStation 2", "color_key": "print_blue"},
-    "print_8mb": {"center_mm": [0.3, 3.75, 15.3], "size_mm": [10.7, 6.3], "text": "8MB", "color_key": "print_gray"},
-    "print_memory_card": {"center_mm": [0.0, 3.75, 20.8], "size_mm": [22.0, 2.0], "text": "MEMORY CARD", "color_key": "print_gray"},
-    "print_magicgate": {"center_mm": [-0.2, 3.75, 25.2], "size_mm": [16.5, 1.4], "text": "MagicGate", "color_key": "print_gray"},
-    "label_recess": {"center_mm": [0.0, 3.75, 37.3], "size_mm": [38.5, 20.0], "depth_mm": 0.3},
-    "groove_line": {"z_mm": 47.2, "x_span_mm": [-19.0, 19.0], "width_mm": 0.4},
-    "emboss_sony": {"center_mm": [-0.3, 3.75, 51.7], "size_mm": [15.0, 2.7], "relief_mm": 0.2, "color_key": "body"},
-    "grip_ridges": {"sides": ["-X", "+X"], "z_span_mm": [29.0, 46.0], "count": 4, "amplitude_mm": 0.5}
+    "connector_window": {
+      "center_mm": [
+        0.0,
+        -0.1,
+        0.0
+      ],
+      "size_mm": [
+        28.0,
+        4.0
+      ],
+      "depth_mm": 6.0,
+      "ribs": 2,
+      "rib_width_mm": 1.6,
+      "rib_x_mm": [
+        7.4,
+        -3.0
+      ],
+      "pin_count": 8,
+      "pin_pitch_mm": 2.4,
+      "keying": "asymmetric rib placement; card only fits label(triangle)-side up"
+    },
+    "triangle_mark": {
+      "center_mm": [
+        0.0,
+        3.55,
+        3.0
+      ],
+      "size_mm": [
+        11.0,
+        2.7
+      ],
+      "points_to": "-Z",
+      "relief": "raised/recessed, body color"
+    },
+    "holes": {
+      "centers_mm": [
+        [
+          -17.5,
+          3.55,
+          3.8
+        ],
+        [
+          17.5,
+          3.55,
+          3.8
+        ]
+      ],
+      "diameter_mm": 1.8
+    },
+    "print_ps_logo": {
+      "center_mm": [
+        -13.9,
+        3.55,
+        8.0
+      ],
+      "size_mm": [
+        7.2,
+        5.5
+      ],
+      "color_key": "print_blue"
+    },
+    "print_playstation2": {
+      "center_mm": [
+        6.84,
+        3.55,
+        8.77
+      ],
+      "size_mm": [
+        22.8,
+        4.46
+      ],
+      "text": "PlayStation 2",
+      "word_bbox_mm": [
+        [
+          -4.56,
+          7.0
+        ],
+        [
+          14.82,
+          11.0
+        ]
+      ],
+      "two_bbox_mm": [
+        [
+          15.78,
+          6.54
+        ],
+        [
+          18.24,
+          10.06
+        ]
+      ],
+      "color_key": "print_blue",
+      "note": "bbox includes the y descender; 'PlayStation' and the larger '2' measured separately on memcard_top_forenti.jpg (22.71 px/mm) because the card's lockup differs from the logo SVG"
+    },
+    "print_8mb": {
+      "center_mm": [
+        0.3,
+        3.55,
+        15.3
+      ],
+      "size_mm": [
+        10.7,
+        6.3
+      ],
+      "text": "8MB",
+      "color_key": "print_gray"
+    },
+    "print_memory_card": {
+      "center_mm": [
+        0.0,
+        3.55,
+        20.8
+      ],
+      "size_mm": [
+        22.0,
+        2.0
+      ],
+      "text": "MEMORY CARD",
+      "color_key": "print_gray"
+    },
+    "print_magicgate": {
+      "center_mm": [
+        -0.2,
+        3.55,
+        25.2
+      ],
+      "size_mm": [
+        16.3,
+        1.6
+      ],
+      "text": "MagicGate",
+      "color_key": "print_gray",
+      "note": "size = traced outline bbox (M and G are taller than the small caps)"
+    },
+    "label_recess": {
+      "center_mm": [
+        0.0,
+        3.55,
+        37.3
+      ],
+      "size_mm": [
+        38.5,
+        20.0
+      ],
+      "depth_mm": 0.3
+    },
+    "groove_line": {
+      "z_mm": 47.2,
+      "x_span_mm": [
+        -19.0,
+        19.0
+      ],
+      "width_mm": 0.4
+    },
+    "emboss_sony": {
+      "center_mm": [
+        -0.3,
+        3.55,
+        51.7
+      ],
+      "size_mm": [
+        15.0,
+        2.7
+      ],
+      "relief_mm": 0.2,
+      "color_key": "body"
+    },
+    "grip_ridges": {
+      "sides": [
+        "-X",
+        "+X"
+      ],
+      "z_span_mm": [
+        29.0,
+        46.0
+      ],
+      "count": 4,
+      "amplitude_mm": 0.5
+    },
+    "body_thickness_mm": 7.3
   },
-  "insertion": {"direction": [0, 0, -1], "orientation": "triangle-mark side up when console is horizontal (Sony manual)"},
+  "insertion": {
+    "direction": [
+      0,
+      0,
+      -1
+    ],
+    "orientation": "triangle-mark side up when console is horizontal (Sony manual)"
+  },
   "colors": {
     "body": "#232225",
     "label_recess": "#232225",
@@ -32,7 +220,7 @@
   },
   "grades": {
     "size_mm.x": "交叉验证",
-    "size_mm.y": "交叉验证",
+    "size_mm.y": "交叉验证（机身 7.3 + SONY 凸字 0.2）",
     "size_mm.z": "照片校准",
     "connector_end_chamfer_mm": "照片校准",
     "connector_window": "照片校准",
@@ -45,6 +233,12 @@
     "insertion.orientation": "官方",
     "colors": "照片校准"
   },
-  "estimated_keys": ["connector_window.size_mm", "connector_window.depth_mm", "connector_window.rib_x_mm", "grip_ridges.amplitude_mm", "rear_end_corner_radius_mm"],
-  "notes": "Width 42 / thickness 7.5 from two independent community CAD files (Printables 403806 holder SCAD, Printables 1307502 PicoMemCard shell SCAD: 42 x 7.3). Length from photo aspect ratio 1.345 (3 photos). Print positions from memcard_top_forenti.jpg with 22.71 px/mm. See PS2_Model/REFERENCE_NOTES_memory_card.md."
+  "estimated_keys": [
+    "connector_window.size_mm",
+    "connector_window.depth_mm",
+    "connector_window.rib_x_mm",
+    "grip_ridges.amplitude_mm",
+    "rear_end_corner_radius_mm"
+  ],
+  "notes": "Width 42 / thickness 7.5 from two independent community CAD files (Printables 403806 holder SCAD, Printables 1307502 PicoMemCard shell SCAD: 42 x 7.3). Length from photo aspect ratio 1.345 (3 photos). Print positions from memcard_top_forenti.jpg with 22.71 px/mm. See PS2_Model/REFERENCE_NOTES_memory_card.md. Thickness: body 7.3 (PicoMemCard shell SCAD) + 0.2 SONY emboss = 7.5 overall (holder SCAD). Prints: PS logo = vectors/PS.svg, wordmark = vectors/PlayStation2_logo_commons.svg, SONY = vectors/SONY.svg, MagicGate traced from memcard_top_forenti.jpg (PS2_Model/source/trace_memory_card_prints.py), 8MB / MEMORY CARD set in Helvetica (the letterforms on the card are Helvetica)."
 }

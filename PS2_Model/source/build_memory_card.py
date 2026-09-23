@@ -6,12 +6,13 @@ Run from the repo root (headless):
         --python-exit-code 1 --python PS2_Model/source/build_memory_card.py [-- --render]
 
 Outputs PS2_Model/exports/PS2-MemoryCard.usdz and PS2_Model/PS2-MemoryCard.blend;
-with --render also PS2_Model/renders/memory_card_{top,34_rear,34_connector}.png.
+with --render also PS2_Model/renders/memory_card_{top,prints,34_rear,34_connector}.png.
 
 Frame (contract_parts/PS2-MemoryCard.json): card flat, label side up (+Y),
 connector end toward -Z. Root PS2_MEMORY_CARD = centre of the connector end face,
-so the card spans X -21..21, Y -3.75..3.75, Z 0..56.5 (the embossed SONY adds
-0.2 mm above the label face, the flat prints 0.05 mm).
+so the card spans X -21..21, Y -3.75..3.75, Z 0..56.5: the body is 7.3 mm thick
+(Y -3.75..+3.55, label face +3.55) and the embossed SONY rises 0.2 mm to +3.75;
+flat prints sit 0.05 mm above the face.
 
 Hierarchy:
     PS2_MEMORY_CARD (empty, origin)
@@ -19,19 +20,26 @@ Hierarchy:
                        R2.5 rear corners, side grip waves, edge chamfers, a parting
                        groove, the recessed triangle, 2 holes, label recess, groove
                        line and the 3-bay connector window (2 asymmetric ribs)
-      CONNECTOR_PINS   8 gold contact pads on the floor of the connector bays
+      CONNECTOR_PINS   8 gold contact pads (1.5 x 0.35 mm) on the bay floors, 3/3/2
       TRADEMARK_PRINTS (empty)
         PRINT_PS_LOGO, PRINT_PLAYSTATION2, PRINT_8MB, PRINT_MEMORY_CARD,
         PRINT_MAGICGATE  flat single-sided print meshes 0.05 mm above the face
         EMBOSS_SONY      raised 0.2 mm body-colour SONY (a trademark, so it lives
                          here too; hiding TRADEMARK_PRINTS leaves a plain face)
 
-Fonts: system fonts are used when present (macOS): Arial Bold for
-"PlayStation 2" / "MagicGate" (small caps), Arial for "8MB" / "MEMORY CARD",
-SuperClarendon for SONY (Sony's logotype is Clarendon-like). Each falls back to
-Blender's built-in font. Every text mesh is scaled to the photo-measured bbox in
-the contract, so the font only affects glyph shapes, not placement or size.
-The PS logo is a hand-traced polygon from memcard_top_forenti.jpg.
+Print sources:
+  PS logo        tools/ps2_blender/vectors/PS.svg (single colour, official)
+  PlayStation 2  wordmark paths of vectors/PlayStation2_logo_commons.svg (no PS2
+                 symbol, no (R)); "PlayStation" and the larger "2" are placed
+                 separately at their photo-measured boxes (the card's lockup
+                 differs from the logo file)
+  SONY           vectors/SONY.svg, extruded 0.2 mm
+  MagicGate      traced from memcard_top_forenti.jpg by trace_memory_card_prints.py
+                 (-> memory_card_prints_traced.json); custom logotype, no vector
+  8MB, MEMORY CARD  Helvetica (/System/Library/Fonts/Helvetica.ttc; the card's
+                 letterforms are Helvetica), falls back to Blender's built-in font
+Vectors keep their proportions (one uniform scale to the contract box); font
+text is fitted to the box per axis.
 """
 import math
 import sys
@@ -49,16 +57,17 @@ SPEC = C.load_contract('PS2-MemoryCard')
 LAY = SPEC['layout']
 COL = SPEC['colors']
 SX, SY, SZ = SPEC['size_mm']
-HX, HY = SX / 2, SY / 2          # 21, 3.75
-TOP = HY                          # label face (mm)
+HX, HY = SX / 2, SY / 2          # 21, 3.75 (overall bbox half sizes)
+BOTTOM = -HY                      # back face (mm)
+TOP = BOTTOM + LAY['body_thickness_mm']   # label face: 7.3 body -> Y = +3.55
 PRINT_LIFT = 0.05                 # mm above the face for flat prints
 
-FONT_DIR = Path('/System/Library/Fonts/Supplemental')
-FONTS = {
-    'bold': FONT_DIR / 'Arial Bold.ttf',
-    'regular': FONT_DIR / 'Arial.ttf',
-    'serif': FONT_DIR / 'SuperClarendon.ttc',
-}
+VEC = C.HERE / 'vectors'          # shared official vectors (see its README)
+PS2_WORD_IDS = {'path3003', 'path3005', 'path3007', 'path3009', 'path3011', 'path3013',
+                'path3015', 'path3017', 'path3019', 'path3021', 'path3023', 'path3025'}
+PS2_TWO_ID = 'path3031'           # (path3027/3029 = the (R) mark, not printed on the card)
+TRACED = Path(__file__).resolve().parent / 'memory_card_prints_traced.json'
+FONTS = {'helvetica': Path('/System/Library/Fonts/Helvetica.ttc')}
 
 
 # ---------------------------------------------------------------- materials
@@ -68,7 +77,9 @@ def materials():
         'label': C.mat('MC_LabelRecess', C.hex_rgba(COL['label_recess']), rough=0.5),
         'blue': C.mat('MC_PrintBlue', C.hex_rgba(COL['print_blue']), rough=0.45),
         'gray': C.mat('MC_PrintGray', C.hex_rgba(COL['print_gray']), rough=0.5),
-        'pins': C.mat('MC_ContactGold', C.hex_rgba(COL['connector_pins']), rough=0.3, metal=1.0),
+        # partly metallic so the pads read gold even when the dark bays give them
+        # nothing bright to reflect
+        'pins': C.mat('MC_ContactGold', C.hex_rgba(COL['connector_pins']), rough=0.35, metal=0.6),
     }
 
 
@@ -131,9 +142,9 @@ def shell_mesh(name):
     the top/bottom edge chamfers and a shallow parting groove on the sides."""
     base = outline_xz()
     groove_y0, groove_y1, groove_d = -1.05, -0.8, 0.15
-    rings = [(-HY, 0.3), (-HY + 0.3, 0.0),
+    rings = [(BOTTOM, 0.3), (BOTTOM + 0.3, 0.0),
              (groove_y0, 0.0), (groove_y0, groove_d), (groove_y1, groove_d), (groove_y1, 0.0),
-             (HY - 0.3, 0.0), (HY, 0.3)]
+             (TOP - 0.3, 0.0), (TOP, 0.3)]
     bm = bmesh.new()
     loops = []
     for y, d in rings:
@@ -250,15 +261,18 @@ def build_pins(M, bays):
     floor = win['center_mm'][1] - win['size_mm'][1] / 2
     counts = [3, 3, 2] if win['pin_count'] == 8 else None
     bm = bmesh.new()
-    pad_w, z0, z1 = 1.1, 0.8, win["depth_mm"] - 0.3
+    pad_w, pad_t, z0, z1 = 1.5, 0.35, 0.5, win["depth_mm"] - 0.3
     for (x0, x1), n in zip(bays, counts):
         mid = (x0 + x1) / 2
         for k in range(n):
             x = mid + (k - (n - 1) / 2) * pitch
             geom = bmesh.ops.create_cube(bm, size=1.0)
             vs = geom['verts']
-            bmesh.ops.scale(bm, vec=(pad_w * MM, 0.12 * MM, (z1 - z0) * MM), verts=vs)
-            bmesh.ops.translate(bm, vec=(x * MM, (floor + 0.06) * MM, (z0 + z1) / 2 * MM), verts=vs)
+            bmesh.ops.scale(bm, vec=(pad_w * MM, pad_t * MM, (z1 - z0) * MM), verts=vs)
+            bmesh.ops.translate(bm, vec=(x * MM, (floor + pad_t / 2) * MM, (z0 + z1) / 2 * MM),
+                                verts=vs)
+    bm.normal_update()  # the bottoms lie on the bay floor: drop them
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.y < -0.99], context='FACES')
     pins = C._mesh_object('CONNECTOR_PINS', bm)
     return C.assign(pins, M['pins'])
 
@@ -271,78 +285,157 @@ def load_font(key):
             return bpy.data.fonts.load(str(path), check_existing=True)
         except RuntimeError:
             pass
+    print(f'[memory_card] font {path} missing, using Blender built-in font')
     return bpy.data.fonts.load('<builtin>', check_existing=True)
 
 
-def text_mesh(name, body, font_key, extrude_mm=0.0, small_caps=False, resolution=2):
-    """Text as mesh data in its own XY plane (unscaled font units)."""
+def curve_to_mesh(ob):
+    """Evaluated (filled) mesh of a curve/text object, in world space, then the
+    object and its data are removed."""
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = bpy.data.meshes.new_from_object(ob.evaluated_get(dg), depsgraph=dg)
+    me.transform(ob.matrix_world)
+    data = ob.data
+    bpy.data.objects.remove(ob, do_unlink=True)
+    if data.users == 0:
+        (bpy.data.curves.remove if isinstance(data, bpy.types.Curve) else bpy.data.meshes.remove)(data)
+    return me
+
+
+def text_mesh(name, body, font_key, resolution=2):
+    """Text as flat mesh data in its own XY plane (font units)."""
     cu = bpy.data.curves.new(name + '_txt', 'FONT')
     cu.body = body
     cu.font = load_font(font_key)
     cu.resolution_u = resolution
-    cu.extrude = extrude_mm / 2  # relative; rescaled below
-    if small_caps:
-        cu.small_caps_scale = 0.78
-        for ch in cu.body_format:
-            ch.use_small_caps = True
     ob = bpy.data.objects.new(name + '_txtobj', cu)
     bpy.context.scene.collection.objects.link(ob)
-    bpy.context.view_layer.update()
-    dg = bpy.context.evaluated_depsgraph_get()
-    me = bpy.data.meshes.new_from_object(ob.evaluated_get(dg), depsgraph=dg)
-    bpy.data.objects.remove(ob, do_unlink=True)
-    bpy.data.curves.remove(cu)
+    return curve_to_mesh(ob)
+
+
+def svg_mesh(svg_path, drop_ids=(), keep_ids=None, resolution=3):
+    """Import an SVG (shared vectors, tools/ps2_blender/vectors) as one flat
+    filled mesh in the importer's XY plane (y up). Elements whose id is in
+    drop_ids are removed first; with keep_ids only those <path>s are kept."""
+    import tempfile
+    import xml.etree.ElementTree as ET
+    ET.register_namespace('', 'http://www.w3.org/2000/svg')
+    ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
+    tree = ET.parse(svg_path)
+    parents = {c: p for p in tree.iter() for c in p}
+    for el in list(tree.iter()):
+        tag = el.tag.split('}')[-1]
+        drop = el.get('id') in drop_ids
+        if keep_ids is not None and tag in ('path', 'polygon', 'rect', 'circle', 'ellipse'):
+            drop = drop or el.get('id') not in keep_ids
+        if drop and el in parents:
+            parents[el].remove(el)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_svg = Path(tmp) / Path(svg_path).name
+        tree.write(tmp_svg)
+        before = set(bpy.data.objects)
+        cols_before = set(bpy.data.collections)
+        mats_before = set(bpy.data.materials)
+        bpy.ops.import_curve.svg(filepath=str(tmp_svg))
+    new = [o for o in bpy.data.objects if o not in before]
+    bm = bmesh.new()
+    for ob in new:
+        if ob.type != 'CURVE':
+            bpy.data.objects.remove(ob, do_unlink=True)
+            continue
+        ob.data.dimensions = '2D'
+        ob.data.fill_mode = 'BOTH'
+        ob.data.resolution_u = resolution
+        me = curve_to_mesh(ob)
+        bm.from_mesh(me)
+        bpy.data.meshes.remove(me)
+    for col in set(bpy.data.collections) - cols_before:
+        bpy.data.collections.remove(col)
+    for m in set(bpy.data.materials) - mats_before:  # SVG fill materials
+        bpy.data.materials.remove(m)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-9)
+    me = bpy.data.meshes.new(Path(svg_path).stem)
+    bm.to_mesh(me)
+    bm.free()
     return me
 
 
-def fit_to_face(me, cx, cz, w, h, y_bottom, thickness=None):
-    """Map text-plane coords (x right, y up, z normal) onto the label face so it
-    reads with the connector end at the top: x -> +X, y -> -Z, z -> +Y. Scales the
-    glyph bbox to exactly w x h mm centred on (cx, cz); z is set to y_bottom
-    (flat) or stretched to `thickness` mm above y_bottom."""
+def traced_mesh(key):
+    """Polygons from memory_card_prints_traced.json (card mm, X/Z) as a flat
+    filled mesh in a text-like XY plane (x = X, y = -Z), even-odd filled."""
+    import json
+    data = json.loads(TRACED.read_text())
+    cu = bpy.data.curves.new(key + '_trace', 'CURVE')
+    cu.dimensions, cu.fill_mode = '2D', 'BOTH'
+    for poly in data['prints'][key]:
+        sp = cu.splines.new('POLY')
+        sp.points.add(len(poly) - 1)
+        for pt, (x, z) in zip(sp.points, poly):
+            pt.co = (x, -z, 0.0, 1.0)
+        sp.use_cyclic_u = True
+    ob = bpy.data.objects.new(key + '_traceobj', cu)
+    bpy.context.scene.collection.objects.link(ob)
+    return curve_to_mesh(ob)
+
+
+def fit_to_face(me, box, y_bottom, uniform=False, scale=None):
+    """Map plane coords (x right, y up) onto the label face so the print reads
+    with the connector end at the top: x -> +X, y -> -Z, at height y_bottom (mm).
+    box = ((X0, Z0), (X1, Z1)) in card mm. The glyph bbox is centred on the box
+    and scaled to it: independently per axis (fonts), with one uniform factor
+    (geometric mean; vectors keep their official proportions), or by `scale`
+    (mm per plane unit, e.g. 1.0 for traced mm data)."""
+    (bx0, bz0), (bx1, bz1) = box
     xs = [v.co.x for v in me.vertices]
     ys = [v.co.y for v in me.vertices]
-    zs = [v.co.z for v in me.vertices]
-    bx, by = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
-    sx, sy = w / (max(xs) - min(xs)), h / (max(ys) - min(ys))
-    z0, zr = min(zs), (max(zs) - min(zs)) or 1.0
+    mx, my = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    sx, sy = (bx1 - bx0) / (max(xs) - min(xs)), (bz1 - bz0) / (max(ys) - min(ys))
+    if scale is not None:
+        sx = sy = scale
+    elif uniform:
+        sx = sy = math.sqrt(sx * sy)
+    cx, cz = (bx0 + bx1) / 2, (bz0 + bz1) / 2
     for v in me.vertices:
-        x, y, z = v.co
-        X = cx + (x - bx) * sx
-        Z = cz - (y - by) * sy
-        Y = y_bottom + (0.0 if thickness is None else (z - z0) / zr * thickness)
-        v.co = (X * MM, Y * MM, Z * MM)
+        x, y, _ = v.co
+        v.co = ((cx + (x - mx) * sx) * MM, y_bottom * MM, (cz - (y - my) * sy) * MM)
     me.update()
     return me
 
 
+def box_of(key, size=None):
+    lay = LAY[key]
+    cx, _, cz = lay['center_mm']
+    w, h = size or lay['size_mm']
+    return ((cx - w / 2, cz - h / 2), (cx + w / 2, cz + h / 2))
+
+
 def merge_meshes(name, meshes):
+    """One object from several flat print meshes, all faces facing +Y."""
     bm = bmesh.new()
     for me in meshes:
         bm.from_mesh(me)
         bpy.data.meshes.remove(me)
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-7)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-9)
+    bm.normal_update()
     for f in bm.faces:
+        if f.normal.y < 0:
+            f.normal_flip()
         f.smooth = False
     return C._mesh_object(name, bm)
 
 
-def flat_polygons(name, polys_mm):
-    """One flat, upward-facing mesh at the print height from several overlapping
-    [(x, z)] polygons: they are extruded to prisms, boolean-unioned (so no
-    coplanar overlaps remain) and only the top faces are kept."""
-    y = TOP + PRINT_LIFT
-    parts = [prism(f'{name}_{i}', poly, y - 0.1, y) for i, poly in enumerate(polys_mm)]
-    ob = parts[0]
-    ob.name = name
-    ob.data.name = name
-    for other in parts[1:]:
-        C.boolean(ob, other, op='UNION')
+def emboss(ob, height_mm):
+    """Extrude a flat, upward-facing print mesh by height_mm along +Y (side walls
+    + top); the bottom stays open because it sits inside the body."""
     bm = bmesh.new()
     bm.from_mesh(ob.data)
-    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.y < 0.99], context='FACES')
-    bmesh.ops.dissolve_limit(bm, angle_limit=0.01, verts=bm.verts, edges=bm.edges)
-    bmesh.ops.triangulate(bm, faces=bm.faces, quad_method='BEAUTY', ngon_method='EAR_CLIP')
+    res = bmesh.ops.extrude_face_region(bm, geom=list(bm.faces))
+    moved = [e for e in res['geom'] if isinstance(e, bmesh.types.BMVert)]
+    bmesh.ops.translate(bm, vec=(0, height_mm * MM, 0), verts=moved)
+    bottom = [f for f in bm.faces if all(v not in moved for v in f.verts)]
+    bmesh.ops.delete(bm, geom=bottom, context='FACES')
+    bm.normal_update()
     for f in bm.faces:
         f.smooth = False
     bm.to_mesh(ob.data)
@@ -350,80 +443,46 @@ def flat_polygons(name, polys_mm):
     return ob
 
 
-# PlayStation logo traced on memcard_top_forenti.jpg (pixel coordinates; the
-# logo's blue bbox there is x 202..370, y 233..359). The upright P and the
-# flat "S" drawn as two C-shaped halves either side of the P stem.
-PS_P = [(261, 359), (261, 232), (275, 232), (292, 234), (306, 238), (318, 244), (328, 253),
-        (334, 264), (336, 277), (335, 290), (330, 300), (321, 306), (310, 307), (303, 304),
-        (301, 298), (301, 262), (299, 255), (294, 253), (292, 253), (292, 359)]
-PS_S_LEFT = [(270, 305), (262, 305), (246, 311), (228, 319), (212, 328), (203, 337),
-             (203, 345), (210, 352), (224, 357), (243, 359), (270, 359), (270, 335),
-             (262, 335), (246, 337), (232, 339), (225, 338), (226, 335), (240, 331),
-             (262, 326), (270, 326)]
-PS_S_RIGHT = [(284, 316), (292, 316), (305, 313), (322, 311), (342, 311), (359, 314),
-              (369, 320), (370, 328), (364, 335), (350, 340), (330, 344), (310, 347),
-              (292, 349), (284, 349), (284, 341), (292, 341), (315, 335), (338, 329),
-              (352, 325), (350, 321), (334, 324), (312, 330), (292, 335), (284, 335)]
-PS_BBOX_PX = (202, 370, 233, 359)
-
-
-def ps_logo_polys():
-    lay = LAY['print_ps_logo']
-    cx, _, cz = lay['center_mm']
-    w, h = lay['size_mm']
-    x0, x1, y0, y1 = PS_BBOX_PX
-    def tf(p):
-        return (cx + ((p[0] - (x0 + x1) / 2) / (x1 - x0)) * w,
-                cz + ((p[1] - (y0 + y1) / 2) / (y1 - y0)) * h)
-    return [[tf(p) for p in poly] for poly in (PS_P, PS_S_LEFT, PS_S_RIGHT)]
-
-
 def build_prints(M, parent):
     y = TOP + PRINT_LIFT
     made = []
 
-    ps = flat_polygons('PRINT_PS_LOGO', ps_logo_polys())
-    made.append(C.assign(ps, M['blue']))
+    # PS logo: single-colour vector (PS.svg), official proportions
+    ps = fit_to_face(svg_mesh(VEC / 'PS.svg', resolution=3), box_of('print_ps_logo'), y,
+                     uniform=True)
+    made.append(C.assign(merge_meshes('PRINT_PS_LOGO', [ps]), M['blue']))
 
-    def flat_text(name, key, body, font, mat, small_caps=False):
-        lay = LAY[key]
-        cx, _, cz = lay['center_mm']
-        w, h = lay['size_mm']
-        me = fit_to_face(text_mesh(name, body, font, small_caps=small_caps), cx, cz, w, h, y)
-        ob = merge_meshes(name, [me])
-        made.append(C.assign(ob, mat))
+    # "PlayStation 2": wordmark paths of PlayStation2_logo_commons.svg (no PS2
+    # symbol, no (R)); "PlayStation" and the larger "2" placed separately as on the card
+    lay = LAY['print_playstation2']
+    word = fit_to_face(svg_mesh(VEC / 'PlayStation2_logo_commons.svg', keep_ids=PS2_WORD_IDS,
+                                resolution=2), lay['word_bbox_mm'], y, uniform=True)
+    two = fit_to_face(svg_mesh(VEC / 'PlayStation2_logo_commons.svg', keep_ids={PS2_TWO_ID},
+                               resolution=3), lay['two_bbox_mm'], y, uniform=True)
+    made.append(C.assign(merge_meshes('PRINT_PLAYSTATION2', [word, two]), M['blue']))
 
-    flat_text('PRINT_PLAYSTATION2', 'print_playstation2', 'PlayStation 2', 'bold', M['blue'])
-    flat_text('PRINT_MEMORY_CARD', 'print_memory_card', 'MEMORY CARD', 'regular', M['gray'])
-    flat_text('PRINT_MAGICGATE', 'print_magicgate', 'MagicGate', 'bold', M['gray'], small_caps=True)
+    # "MEMORY CARD": Helvetica, fitted to the photo bbox
+    mc = fit_to_face(text_mesh('PMC', 'MEMORY CARD', 'helvetica'), box_of('print_memory_card'), y)
+    made.append(C.assign(merge_meshes('PRINT_MEMORY_CARD', [mc]), M['gray']))
 
-    # "8MB": big 8 + small MB sharing the baseline; split measured on the photo
-    # (8 = 44 % of the width, 9.5 % gap; MB cap height 38 % of the 8).
-    lay = LAY['print_8mb']
-    cx, _, cz = lay['center_mm']
-    w, h = lay['size_mm']
-    left, top = cx - w / 2, cz - h / 2
-    w8, gap = 0.444 * w, 0.095 * w
-    hmb = 0.38 * h
-    eight = fit_to_face(text_mesh('P8', '8', 'regular'), left + w8 / 2, cz, w8, h, y)
-    wmb = w - w8 - gap
-    mb = fit_to_face(text_mesh('PMB', 'MB', 'regular'), left + w8 + gap + wmb / 2,
-                     top + h - hmb / 2, wmb, hmb, y)
+    # "MagicGate": traced logotype, traced scale, centred on the contract centre
+    mg = fit_to_face(traced_mesh('print_magicgate'), box_of('print_magicgate'), y, scale=1.0)
+    made.append(C.assign(merge_meshes('PRINT_MAGICGATE', [mg]), M['gray']))
+
+    # "8MB": Helvetica big 8 + small MB sharing the baseline; split measured on the
+    # photo (8 = 44 % of the width, 9.5 % gap; MB cap height 38 % of the 8).
+    (x0, z0), (x1, z1) = box_of('print_8mb')
+    w, h = x1 - x0, z1 - z0
+    w8, gap, hmb = 0.444 * w, 0.095 * w, 0.38 * h
+    eight = fit_to_face(text_mesh('P8', '8', 'helvetica', resolution=3), ((x0, z0), (x0 + w8, z1)), y)
+    mb = fit_to_face(text_mesh('PMB', 'MB', 'helvetica'), ((x0 + w8 + gap, z1 - hmb), (x1, z1)), y)
     made.append(C.assign(merge_meshes('PRINT_8MB', [eight, mb]), M['gray']))
 
-    # raised SONY in body colour
-    lay = LAY['emboss_sony']
-    cx, _, cz = lay['center_mm']
-    w, h = lay['size_mm']
-    relief = lay['relief_mm']
-    me = fit_to_face(text_mesh('SONY', 'SONY', 'serif', extrude_mm=0.2, resolution=2),
-                     cx, cz, w, h, TOP - 0.05, thickness=relief + 0.05)
-    sony = merge_meshes('EMBOSS_SONY', [me])
-    bm = bmesh.new()  # the bottom cap sits inside the body: drop it
-    bm.from_mesh(sony.data)
-    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.y < -0.99], context='FACES')
-    bm.to_mesh(sony.data)
-    bm.free()
+    # SONY: vector (SONY.svg), raised in body colour from inside the body
+    relief = LAY['emboss_sony']['relief_mm']
+    sony = fit_to_face(svg_mesh(VEC / 'SONY.svg', resolution=2), box_of('emboss_sony'),
+                       TOP - 0.05, uniform=True)
+    sony = emboss(merge_meshes('EMBOSS_SONY', [sony]), relief + 0.05)
     made.append(C.assign(sony, M['body']))
 
     for ob in made:
@@ -480,6 +539,7 @@ def render_views(out_dir):
     centre = (0, 0, SZ / 2 * MM)
     views = {
         'top': dict(ortho=0.08, eye=(0, 0.3, SZ / 2 * MM), up=(0, 0, -1)),
+        'prints': dict(ortho=0.044, eye=(0, 0.3, 0.0155), target=(0, 0, 0.0155), up=(0, 0, -1)),
         '34_rear': dict(lens=70, eye=(-0.09, 0.11, 0.17), up=(0, 1, 0)),
         '34_connector': dict(lens=70, eye=(0.07, 0.09, -0.13), up=(0, 1, 0)),
     }
@@ -489,7 +549,7 @@ def render_views(out_dir):
         else:
             cam_data.type, cam_data.lens = 'PERSP', v['lens']
         cam_data.clip_start = 0.001
-        look_at(cam, v['eye'], centre, up=v['up'])
+        look_at(cam, v['eye'], v.get('target', centre), up=v['up'])
         scn.render.filepath = str(out_dir / f'memory_card_{name}.png')
         bpy.ops.render.render(write_still=True)
 
