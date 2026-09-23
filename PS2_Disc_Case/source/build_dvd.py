@@ -37,7 +37,7 @@ import common as C  # noqa: E402
 MM = 0.001
 HERE = Path(__file__).resolve().parent
 ASSET_DIR = HERE.parent
-SEGS = 72
+SEGS = 64
 
 
 # =================================================================== helpers
@@ -185,28 +185,155 @@ def add_flat_poly(bm, pts, M, mi=0):
     bmesh.ops.triangulate(bm, faces=[f], quad_method='BEAUTY', ngon_method='EAR_CLIP')
 
 
-# PlayStation family logo traced on a reference crop (px, 690 x 465 box at 40,45)
-_P_STEM = [(290, 505), (410, 510), (410, 45), (300, 45), (290, 55)]
-_P_BOWL = [(410, 45), (495, 45), (545, 58), (580, 85), (598, 130), (600, 230), (592, 290),
-           (565, 332), (520, 352), (470, 353), (445, 345), (445, 130), (410, 130)]
-_S_LEFT = [((300, 360), 20), ((220, 370), 20), ((140, 392), 20), ((82, 422), 18), ((58, 452), 15),
-           ((85, 478), 16), ((150, 485), 19), ((230, 481), 22), ((300, 476), 24)]
-_S_RIGHT_LOW = [((405, 480), 14), ((520, 483), 12), ((630, 479), 12), ((695, 468), 14),
-                ((724, 440), 17)]
-_S_RIGHT_TOP = [((724, 440), 17), ((702, 410), 24), ((625, 396), 30), ((525, 397), 32),
-                ((435, 402), 32)]
+# ------------------------------------------------------------ SVG vectors
+VEC = C.REPO / 'tools/ps2_blender/vectors'
+PS2_WORDMARK_PATHS = ['path3003', 'path3005', 'path3023', 'path3007', 'path3009', 'path3011',
+                      'path3025', 'path3021', 'path3013', 'path3015', 'path3017', 'path3019',
+                      'path3027', 'path3029', 'path3031']   # "PlayStation(R)2" in the PS2 logo SVG
 
 
-def add_ps_logo(bm, cx, cy, w, h, M, mis=(0, 0, 0, 0)):
-    """Simplified PlayStation family logo (upright P with open counter slot, flattened
-    two-lobe S) in the local XY plane, fitted to a w x h box centred at (cx, cy),
-    facing +local Z. mis = material index of (P, S left lobe, S right-front, S right-back)."""
-    def T(px, py):
-        return (cx + ((px - 40) / 690 - 0.5) * w, cy + (0.5 - (py - 45) / 465) * h)
-    add_flat_poly(bm, [T(*q) for q in _P_STEM], M, mis[0])
-    add_flat_poly(bm, [T(*q) for q in _P_BOWL], M, mis[0])
-    for stroke, mi in ((_S_LEFT, mis[1]), (_S_RIGHT_LOW, mis[2]), (_S_RIGHT_TOP, mis[3])):
-        add_strip(bm, [T(*q) for q, _ in stroke], [r / 465 * h for _, r in stroke], M, mi)
+def svg_parts(fname, names=None, res=2):
+    """Import a vector from tools/ps2_blender/vectors, fill + mesh each curve object,
+    then delete everything the importer created. Returns [(name, [(x, y)], [faces])]
+    in the importer's units (y up)."""
+    before = {k: set(getattr(bpy.data, k)) for k in ('objects', 'curves', 'materials', 'collections')}
+    bpy.ops.import_curve.svg(filepath=str(VEC / fname))
+    new = [o for o in bpy.data.objects if o not in before['objects']]
+    keep = [o for o in new if o.type == 'CURVE' and (names is None or o.name in names)]
+    for o in keep:
+        o.data.resolution_u = res
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    parts = []
+    for o in sorted(keep, key=lambda o: (names.index(o.name) if names else 0, o.name)):
+        me = bpy.data.meshes.new_from_object(o.evaluated_get(dg))
+        mw = o.matrix_world
+        verts = [((mw @ v.co).x, (mw @ v.co).y) for v in me.vertices]
+        parts.append((o.name, verts, [tuple(p.vertices) for p in me.polygons]))
+        bpy.data.meshes.remove(me)
+    for o in new:
+        bpy.data.objects.remove(o, do_unlink=True)
+    for k in ('curves', 'materials', 'collections'):
+        coll = getattr(bpy.data, k)
+        for item in [i for i in coll if i not in before[k]]:
+            coll.remove(item)
+    return parts
+
+
+def _fit(parts, cx, cy, w, h, fit):
+    xs = [x for _, vs, _ in parts for x, _ in vs]
+    ys = [y for _, vs, _ in parts for _, y in vs]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    sx, sy = w / (x1 - x0), h / (y1 - y0)
+    if fit == 'width':
+        sy = sx
+    elif fit == 'height':
+        sx = sy
+    elif fit == 'contain':
+        sx = sy = min(sx, sy)
+    xc, yc = (x0 + x1) / 2, (y0 + y1) / 2
+    return (lambda x, y: (cx + (x - xc) * sx, cy + (y - yc) * sy),
+            lambda x, y: ((x - x0) / (x1 - x0), (y - y0) / (y1 - y0)))
+
+
+def add_svg(bm, parts, cx, cy, w, h, M, mi=0, fit='width', mi_fn=None):
+    """Flat SVG geometry fitted into a w x h box at (cx, cy) of M's XY plane, every face
+    facing +local Z. mi_fn(part_name, u, v, face_index) -> material index (u, v = face centre, 0-1)."""
+    place, norm = _fit(parts, cx, cy, w, h, fit)
+    for name, verts, faces in parts:
+        loc = [place(x, y) for x, y in verts]
+        bv = [bm.verts.new(M @ Vector((x, y, 0))) for x, y in loc]
+        for fi, f in enumerate(faces):
+            pts = [loc[i] for i in f]
+            area = sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(pts, pts[1:] + pts[:1]))
+            idx = list(f) if area > 0 else list(reversed(f))
+            try:
+                nf = bm.faces.new([bv[i] for i in idx])
+            except ValueError:
+                continue
+            if mi_fn:
+                u = sum(verts[i][0] for i in f) / len(f)
+                v = sum(verts[i][1] for i in f) / len(f)
+                nf.material_index = mi_fn(name, *norm(u, v), fi)
+            else:
+                nf.material_index = mi
+
+
+def add_ps_logo(bm, cx, cy, w, h, M, mis=None, res=2):
+    """PlayStation family logo from PlayStation_logo_commons.svg, fitted (aspect kept)
+    inside w x h. mis=None -> single colour (index 0); mis=(red, yellow, green, blue)
+    colours it like the printed colour logo: red P; S left piece yellow below / green
+    above its mid-height; S right piece green below / blue above."""
+    parts = svg_parts('PlayStation_logo_commons.svg', res=res)
+    if mis is None:
+        add_svg(bm, parts, cx, cy, w, h, M, fit='contain')
+        return
+    # islands (P, S-left, S-right) + a clean horizontal cut through each S piece
+    name, verts, faces = parts[0]
+    tmp = bmesh.new()
+    tv = [tmp.verts.new((x, y, 0)) for x, y in verts]
+    for f in faces:
+        try:
+            tmp.faces.new([tv[i] for i in f])
+        except ValueError:
+            pass
+    isl = tmp.faces.layers.int.new('island')
+    seen, islands = set(), []
+    for f in tmp.faces:
+        if f in seen:
+            continue
+        stack, group = [f], []
+        seen.add(f)
+        while stack:
+            g = stack.pop()
+            group.append(g)
+            for v in g.verts:
+                for h2 in v.link_faces:
+                    if h2 not in seen:
+                        seen.add(h2)
+                        stack.append(h2)
+        islands.append(group)
+    boxes = []
+    for i, group in enumerate(islands):
+        co = [v.co for g in group for v in g.verts]
+        boxes.append((min(c.x for c in co), max(c.x for c in co), min(c.y for c in co), max(c.y for c in co)))
+        for g in group:
+            g[isl] = i
+    p_i = max(range(len(boxes)), key=lambda i: boxes[i][3])
+    others = sorted((i for i in range(len(boxes)) if i != p_i), key=lambda i: boxes[i][0])
+    left_i, right_i = others[0], others[-1]
+    mids = {}
+    for i in (left_i, right_i):
+        mid = (boxes[i][2] + boxes[i][3]) / 2
+        mids[i] = mid
+        geom = [g for g in tmp.faces if g[isl] == i]
+        geom = list({*geom, *(e for g in geom for e in g.edges), *(v for g in geom for v in g.verts)})
+        bmesh.ops.bisect_plane(tmp, geom=geom, plane_co=(0, mid, 0), plane_no=(0, 1, 0))
+    red, yellow, green, blue = mis
+    tv_list = list(tmp.verts)
+    index = {v: k for k, v in enumerate(tv_list)}
+    new_faces, colours = [], []
+    for g in tmp.faces:
+        c = g.calc_center_median()
+        i = g[isl]
+        if i == left_i:
+            col = green if c.y > mids[i] else yellow
+        elif i == right_i:
+            col = blue if c.y > mids[i] else green
+        else:
+            col = red
+        new_faces.append(tuple(index[v] for v in g.verts))
+        colours.append(col)
+    pverts = [(v.co.x, v.co.y) for v in tv_list]
+    tmp.free()
+    add_svg(bm, [(name, pverts, new_faces)], cx, cy, w, h, M, fit='contain',
+            mi_fn=lambda _n, _u, _v, fi: colours[fi])
+
+
+def add_ps2_wordmark(bm, cx, cy, w, h, M, mi=0, res=2, fit='width', registered=True):
+    """Official "PlayStation(R)2" wordmark outlines (PlayStation2_logo_commons.svg)."""
+    names = [n for n in PS2_WORDMARK_PATHS if registered or n not in ('path3027', 'path3029')]
+    add_svg(bm, svg_parts('PlayStation2_logo_commons.svg', names, res), cx, cy, w, h, M, mi, fit)
 
 
 def add_outline(bm, cx, cy, w, h, line, M, mi=0):
@@ -355,18 +482,22 @@ def build():
     t = spec['size_mm'][1] / 2 * MM                 # 0.6
     e = L['edge_round_radius_mm'] * MM              # 0.2
 
-    m_data = C.mat('DVD_data_side', C.hex_rgba(col['data_side']), rough=0.14, metal=1.0)
+    m_data = C.mat('DVD_data_side', C.hex_rgba(col['data_side']), rough=0.12, metal=1.0)
     m_mirror = C.mat('DVD_mirror_band', C.hex_rgba(col['mirror_band']), rough=0.03, metal=1.0)
     m_hub = C.mat('DVD_hub_clear', C.hex_rgba(col['hub_clear_polycarbonate']), rough=0.05, alpha=0.3)
     m_rim = C.mat('DVD_rim', C.hex_rgba('#A9A9AE'), rough=0.25, metal=0.8)
-    m_label = C.mat('DISC_LABEL_default', C.hex_rgba(col['label_default']), rough=0.5)
-    m_ink = C.mat('DVD_print_ink', C.hex_rgba(col['label_ink_black_ntscuc']), rough=0.5)
+    m_label = C.mat('DISC_LABEL_default', C.hex_rgba(col['label_default']), rough=0.45)
+    m_ink = C.mat('DVD_print_ink', C.hex_rgba(col['label_ink_black_ntscuc']), rough=0.4)
 
     root = C.empty('PS2_DVD')
 
-    # clear hub 7.5 -> 20.5 mm (full thickness)
+    # clear hub 7.5 -> 20.5 mm (full thickness) with the molded stacking ring on the
+    # data side (d 37, 0.2 mm high, ECMA-267 third transition area 33-44 allows +0.25)
+    rs = L['stacking_ring_d'] / 2 * MM
+    hs = L['stacking_ring_height_mm'] * MM
     bm = new_bm()
-    add_lathe(bm, [(r_hole, t), (r_clear, t), (r_clear, -t), (r_hole, -t)], [0, 0, 0, 0])
+    add_lathe(bm, [(r_hole, t), (r_clear, t), (r_clear, -t), (rs + 0.4 * MM, -t), (rs, -t - hs),
+                   (rs - 0.4 * MM, -t), (r_hole, -t)], [0] * 7)
     finish('DISC_HUB', bm, [m_hub], smooth_angle=30, parent=root)
 
     # opaque body 20.5 -> 60 mm; profile CCW seen with +r right, +y up
@@ -394,12 +525,12 @@ def build():
     (bu, bv), (bw, bh) = bx['center_uv_mm'], bx['size_mm']
     bm = new_bm()
     add_outline(bm, bu * MM, bv * MM, bw * MM, bh * MM, 0.6 * MM, Mlab)
-    add_ps_logo(bm, bu * MM, (bv + 0.3) * MM, 10.5 * MM, 9.0 * MM, Mlab)
+    add_ps_logo(bm, bu * MM, bv * MM, 11.0 * MM, 9.2 * MM, Mlab)
     finish('LABEL_PS_LOGO_BOX', bm, [m_ink], recalc=False, parent=prints)
     wm = el['playstation2_wordmark']
     (wu, wv), (ww, wh) = wm['center_uv_mm'], wm['size_mm']
     bm = new_bm()
-    add_text(bm, wm['text'], wu * MM, wv * MM, ww * MM, wh * MM, Mlab)
+    add_ps2_wordmark(bm, wu * MM, wv * MM, ww * MM, wh * MM, Mlab)
     finish('LABEL_WORDMARK', bm, [m_ink], recalc=False, parent=prints)
 
     # molded holograms in the clear hub ring (data side, 0.03 mm below it): 3 PS logos
@@ -414,9 +545,9 @@ def build():
         Mh = basis((rc * math.cos(a), -t - 0.03 * MM, rc * math.sin(a)),
                    (tx, 0, tz), (-math.cos(a), 0, -math.sin(a)))
         if k % 2:
-            add_text(bm, 'PlayStation 2', 0, 0, 10.0 * MM, 1.8 * MM, Mh, res=1)
+            add_ps2_wordmark(bm, 0, 0, 9.0 * MM, 1.8 * MM, Mh, res=1, registered=False)
         else:
-            add_ps_logo(bm, 0, 0, 4.2 * MM, 3.2 * MM, Mh)
+            add_ps_logo(bm, 0, 0, 4.2 * MM, 3.2 * MM, Mh, res=1)
     finish('HUB_HOLOGRAMS', bm, [m_holo], recalc=False, parent=prints)
     return root
 
@@ -434,6 +565,7 @@ def main():
     look_at(cam, (0.09, 0.22, 0.17), (0, 0, 0.0))
     render(ASSET_DIR / 'renders/dvd_label.png')
     root.rotation_euler = (0, 0, math.pi)  # render only (export done): data side up
+    bpy.data.objects['KeyLight'].data.energy = 1.5
     render(ASSET_DIR / 'renders/dvd_data.png')
     root.rotation_euler = (0, 0, 0)
 

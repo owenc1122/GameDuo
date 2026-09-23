@@ -5,7 +5,7 @@
     "missing_nodes": [],
     "size_mm_measured": [
       120.0,
-      1.285,
+      1.455,
       120.0
     ],
     "size_mm_target": [
@@ -13,11 +13,11 @@
       1.2,
       120.0
     ],
-    "tris": 3077,
+    "tris": 3774,
     "max_tris": 4000,
     "motion_results": [],
     "passed": true,
-    "checked_at": "2026-09-23T02:35:41+00:00"
+    "checked_at": "2026-09-23T03:10:20+00:00"
   },
   "PS2-Case": {
     "file": "PS2_Disc_Case/exports/PS2-Case.usdz",
@@ -33,16 +33,16 @@
       190.0,
       14.0
     ],
-    "tris": 2322,
+    "tris": 5104,
     "max_tris": 11000,
     "motion_results": [
       {
         "motion": {
-          "node": "CASE_LID",
+          "node": "CASE_SPINE",
           "axis": "rot_y",
           "range_rad": [
             0,
-            3.1416
+            1.5708
           ]
         },
         "errors": [],
@@ -52,7 +52,29 @@
             "collisions": []
           },
           {
-            "value": 3.1416,
+            "value": 1.5708,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "CASE_LID",
+          "axis": "rot_y",
+          "range_rad": [
+            0,
+            1.5708
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": 0,
+            "collisions": []
+          },
+          {
+            "value": 1.5708,
             "collisions": []
           }
         ],
@@ -60,6 +82,6 @@
       }
     ],
     "passed": true,
-    "checked_at": "2026-09-23T02:35:41+00:00"
+    "checked_at": "2026-09-23T03:10:20+00:00"
   }
 }
