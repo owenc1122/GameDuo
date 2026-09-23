@@ -35,6 +35,9 @@ for name,(xc,bn) in cores.items():
   subprocess.run(['install_name_tool','-id',f'@rpath/{name}.framework/{name}',str(f/name)],check=True); subprocess.run(['codesign','--remove-signature',str(f/name)],check=False)
   info['MinimumOSVersion']=stamp_build_version(f/name,simulator=ident.endswith('simulator'))
   (f/'Info.plist').write_bytes(plistlib.dumps(info,fmt=plistlib.FMT_XML))
+  # arm64 simulators refuse to load unsigned dylibs, and simulator builds of the app don't re-sign embedded
+  # frameworks, so simulator slices get an ad-hoc signature. Device slices stay unsigned; archiving signs them.
+  if ident.endswith('simulator'): subprocess.run(['codesign','--force','--sign','-',str(f/name)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
   args += ['-framework',str(f)]
  args += ['-output',str(out/(name+'.xcframework'))]; subprocess.run(args,check=True,stdout=subprocess.DEVNULL)
 print(out)
