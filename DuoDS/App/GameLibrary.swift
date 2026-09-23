@@ -11,6 +11,7 @@ enum GamePlatform: String, Codable, Hashable {
 
     case n64 = "Nintendo 64"
     case psp = "Sony PSP"
+    case ps2 = "Sony PS2"
     static let ndsROMExtensions = ROMFiles.nds
     static let threeDSROMExtensions = ROMFiles.threeDS
     static let threeDSInstallableExtensions = ROMFiles.packages
@@ -22,6 +23,19 @@ enum GamePlatform: String, Codable, Hashable {
         if ndsROMExtensions.contains(ext) { return .nds }
         if threeDSROMExtensions.contains(ext) { return .threeDS }
         return nil
+    }
+
+    /// Like `resolve(fileExtension:)`, but `.iso/.cso/.chd/.bin/.cue` are told apart by content:
+    /// `SYSTEM.CNF` → PS2, `PSP_GAME/PARAM.SFO` → PSP. Unrecognised ISO/CSO/CHD stay PSP (the pre-PS2
+    /// behaviour); unrecognised BIN/CUE are not games.
+    static func resolve(url: URL) -> GamePlatform? {
+        let ext = url.pathExtension.lowercased()
+        guard ROMFiles.discImages.contains(ext) else { return resolve(fileExtension: ext) }
+        switch ROMFiles.ps2DiscKind(url) {
+        case .ps2: return .ps2
+        case .psp: return .psp
+        case .unknown: return ROMFiles.psp.contains(ext) ? .psp : nil
+        }
     }
 
     static func isInstallablePackage(fileExtension: String) -> Bool {
@@ -36,6 +50,7 @@ enum GameCardKind {
     case dsiExclusive
     case threeDS
     case umd
+    case ps2Case
 
     var modelNodeName: String {
         switch self {
@@ -45,6 +60,7 @@ enum GameCardKind {
         case .dsiExclusive: return "dsiExclusive"
         case .threeDS: return "threeDS"
         case .umd: return "umd"
+        case .ps2Case: return "ps2Case"
         }
     }
 
@@ -54,12 +70,14 @@ enum GameCardKind {
         case .dsiExclusive: return "NINTENDO DSi"
         case .threeDS: return "NINTENDO 3DS"
         case .umd: return "UNIVERSAL MEDIA DISC"
+        case .ps2Case: return "PlayStation 2"
         }
     }
 
     static func fallback(for platform: GamePlatform, fileExtension: String) -> GameCardKind {
         if platform == .nds { return .ndsStandard }
         if platform == .psp { return .umd }
+        if platform == .ps2 { return .ps2Case }
         return .threeDS
     }
 }
@@ -89,7 +107,7 @@ struct GameLibraryItem: Identifiable {
     let detail: String
     let platform: GamePlatform
     let cartridgeKind: GameCardKind
-    let icon: UIImage?
+    var icon: UIImage?
     let isBundledTest: Bool
     let programID: UInt64?
     let productID: String?
@@ -102,6 +120,17 @@ struct GameLibraryItem: Identifiable {
     var canBeDeleted: Bool { true }
     var isInstalledTitle: Bool { url.path.contains("/Azahar/sdmc/") }
     var isBundledMK64Port: Bool { isBundledTest && url.lastPathComponent == "MK64-3DS.3dsx" }
+}
+
+/// PS2 library settings stored in `UserDefaults.standard` (bind a Settings toggle with
+/// `@AppStorage(PS2LibrarySettings.onlineCoversKey) var onlineCovers = true`).
+enum PS2LibrarySettings {
+    /// Bool, default true: download missing PS2 covers from xlenore/ps2-covers by serial.
+    static let onlineCoversKey = "ps2OnlineCovers"
+
+    static var onlineCoversEnabled: Bool {
+        UserDefaults.standard.object(forKey: onlineCoversKey) as? Bool ?? true
+    }
 }
 
 struct GameSaveInfo: Identifiable {
@@ -153,7 +182,8 @@ final class GameLibraryStore: ObservableObject {
     }
 
     func originalCover(for game: GameLibraryItem) -> UIImage? {
-        ROMMetadataReader.read(from: game.url, platform: game.platform).icon
+        if game.platform == .ps2 { return ps2Covers[game.id] }
+        return ROMMetadataReader.read(from: game.url, platform: game.platform).icon
     }
 
     func reload() {
@@ -196,8 +226,12 @@ final class GameLibraryStore: ObservableObject {
             urls.append((mk64, true))
         }
 
+        // A cue sheet stands for its BIN tracks; list only the cue.
+        let cueTracks = Set(urls.filter { $0.0.pathExtension.lowercased() == "cue" }
+            .flatMap { ROMFiles.cueReferencedFiles($0.0) }.map { $0.standardizedFileURL.path })
         games = urls.compactMap { url, bundled -> GameLibraryItem? in
-            guard let platform = GamePlatform.resolve(fileExtension: url.pathExtension) else { return nil }
+            guard !cueTracks.contains(url.standardizedFileURL.path),
+                  let platform = GamePlatform.resolve(url: url) else { return nil }
             let metadata = ROMMetadataReader.read(from: url, platform: platform)
             let pro = DuoProStore.shared.preferences(for: url)
             return GameLibraryItem(
@@ -206,7 +240,8 @@ final class GameLibraryStore: ObservableObject {
                 detail: bundled ? String(localized: "开源测试游戏") : (metadata.detail ?? url.pathExtension.uppercased()),
                 platform: platform,
                 cartridgeKind: metadata.cartridgeKind ?? .fallback(for: platform, fileExtension: url.pathExtension),
-                icon: DuoProStore.shared.cover(for: url) ?? metadata.icon,
+                icon: DuoProStore.shared.cover(for: url) ?? metadata.icon
+                    ?? (platform == .ps2 ? ps2Covers[url.standardizedFileURL.path] : nil),
                 isBundledTest: bundled,
                 programID: metadata.programID,
                 productID: metadata.productID,
@@ -230,6 +265,74 @@ final class GameLibraryStore: ObservableObject {
         if selectedID == nil || !games.contains(where: { $0.id == selectedID }) {
             selectedID = games.first?.id
         }
+        requestPS2Covers()
+    }
+
+    // MARK: PS2 covers
+
+    /// Resolved covers by game id, kept for the session so reloads don't hit the disk or network again.
+    private var ps2Covers: [String: UIImage] = [:]
+    /// Game id → whether online lookup was enabled for the attempt. A miss with online enabled is final
+    /// for this launch; a miss while it was disabled is retried once the setting is turned on.
+    private var ps2CoverAttempts: [String: Bool] = [:]
+
+    nonisolated static var ps2CoverDirectory: URL {
+        ROMFiles.supportDirectory().appendingPathComponent("PS2/Covers", isDirectory: true)
+    }
+
+    /// Looks up covers for PS2 games showing no artwork, off the main thread; each result refreshes its card.
+    private func requestPS2Covers() {
+        let online = PS2LibrarySettings.onlineCoversEnabled
+        let pending = games.filter { game in
+            guard game.platform == .ps2, game.icon == nil else { return false }
+            guard let attempt = ps2CoverAttempts[game.id] else { return true }
+            return !attempt && online
+        }
+        guard !pending.isEmpty else { return }
+        let resolver = PS2CoverResolver.live(cacheDirectory: Self.ps2CoverDirectory, onlineEnabled: online)
+        for game in pending {
+            ps2CoverAttempts[game.id] = online
+            let id = game.id, url = game.url, serial = game.productID
+            Task { [weak self] in
+                let data = await Task.detached(priority: .utility) {
+                    await resolver.resolve(romURL: url, serial: serial,
+                                           directoryHasSingleGame: Self.directoryHasSingleGame(url))
+                }.value
+                self?.applyPS2Cover(data, for: id)
+            }
+        }
+    }
+
+    private func applyPS2Cover(_ data: Data?, for id: String) {
+        guard let data, let image = UIImage(data: data) else { return }
+        ps2Covers[id] = image
+        guard let index = games.firstIndex(where: { $0.id == id }), games[index].icon == nil else { return }
+        games[index].icon = image
+        games[index].appearanceRevision = UUID()
+    }
+
+    /// True when the ROM's folder holds no other game (a cue and its BIN tracks count as one), so
+    /// `cover.*` / `folder.*` there belong to it. Each import gets its own folder, so this is the usual case.
+    nonisolated static func directoryHasSingleGame(_ romURL: URL) -> Bool {
+        guard let items = try? FileManager.default.contentsOfDirectory(
+            at: romURL.deletingLastPathComponent(), includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+        ) else { return false }
+        let gameExtensions = ROMFiles.nds.union(ROMFiles.threeDS).union(ROMFiles.n64).union(ROMFiles.psp)
+            .union(ROMFiles.discImages).union(ROMFiles.packages)
+        let candidates = items.filter { gameExtensions.contains($0.pathExtension.lowercased()) }
+        let tracks = Set(candidates.filter { $0.pathExtension.lowercased() == "cue" }
+            .flatMap(ROMFiles.cueReferencedFiles).map(\.lastPathComponent))
+        return candidates.filter { !tracks.contains($0.lastPathComponent) }.count == 1
+    }
+
+    // MARK: PS2 memory cards
+
+    /// Per-game folder memory card: `Application Support/PS2/MemoryCards/<serial or file name>/`.
+    /// Falls back to the ROM's file name rather than `title`, so renaming a game keeps its saves.
+    nonisolated static func ps2MemoryCardRoot(for item: GameLibraryItem) -> URL {
+        PS2MemoryCard.root(
+            in: ROMFiles.supportDirectory().appendingPathComponent("PS2/MemoryCards", isDirectory: true),
+            serial: item.productID, title: item.url.deletingPathExtension().lastPathComponent)
     }
 
     /// v3.0.0 can block forever while saving immediately before its Game Over screen.
@@ -328,6 +431,7 @@ final class GameLibraryStore: ObservableObject {
         var paths: [String] = []
         var messages: [String] = []
         var retainedROMs = false
+        var stagedROMs: [(staged: URL, published: String)] = []
         var configuredMK64 = false
         let packageHasMK64O2R = validated.contains {
             $0.1 == "o2r" && $0.0.lastPathComponent.lowercased() == "mk64.o2r"
@@ -400,8 +504,21 @@ final class GameLibraryStore: ObservableObject {
                 }
             } else if canonical != file { try fm.moveItem(at: file, to: canonical) }
             let relative = String(canonical.path.dropFirst(staging.path.count + 1))
-            paths.append(roms.appendingPathComponent(relative).path)
+            let published = roms.appendingPathComponent(relative).path
+            paths.append(published)
+            stagedROMs.append((canonical, published))
             retainedROMs = true
+        }
+        // BIN tracks of an imported cue stay on disk next to it but are not separate games.
+        let cueTracks = Set(stagedROMs.map(\.staged).filter { $0.pathExtension.lowercased() == "cue" }
+            .flatMap(ROMFiles.cueReferencedFiles).map { $0.standardizedFileURL.path })
+        let trackPaths = Set(stagedROMs.filter { cueTracks.contains($0.staged.standardizedFileURL.path) }.map(\.published))
+        paths.removeAll { trackPaths.contains($0) }
+        if ROMFiles.isArchive(source) {
+            let ps2Games = stagedROMs.map(\.staged).filter {
+                !cueTracks.contains($0.standardizedFileURL.path) && ROMFiles.isPS2Disc($0)
+            }
+            keepPS2ArchiveCovers(in: staging, games: ps2Games, fileManager: fm)
         }
         if ROMFiles.isArchive(source) {
             let companions = try routeVirtualSDCompanions(from: staging, support: support, fileManager: fm)
@@ -418,6 +535,35 @@ final class GameLibraryStore: ObservableObject {
         if !paths.isEmpty { messages.insert(String(localized: "已导入 \(paths.count) 个游戏"), at: 0) }
         if configuredMK64 { messages.append(String(localized: "正在启动 Mario Kart 64 3DS")) }
         return ImportResult(paths: paths, message: messages.joined(separator: "\n"), launchBundledMK64: configuredMK64)
+    }
+
+    /// Archive covers: an image named like the game anywhere in the archive, or `cover.*` / `folder.*`
+    /// when the archive holds a single PS2 game, is copied next to the image as `<basename>.<ext>`
+    /// so `PS2CoverResolver`'s local lookup finds it.
+    nonisolated private static func keepPS2ArchiveCovers(in staging: URL, games: [URL], fileManager: FileManager) {
+        guard !games.isEmpty, let enumerator = fileManager.enumerator(
+            at: staging, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]
+        ) else { return }
+        let images = enumerator.compactMap { $0 as? URL }.filter {
+            !$0.pathComponents.contains("__MACOSX") &&
+                PS2CoverResolver.imageExtensions.contains($0.pathExtension.lowercased()) &&
+                (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }.sorted { $0.path.count < $1.path.count }
+        for game in games {
+            let base = game.deletingPathExtension().lastPathComponent
+            let directory = game.deletingLastPathComponent().standardizedFileURL
+            let alreadyBeside = images.contains {
+                $0.deletingLastPathComponent().standardizedFileURL == directory &&
+                    $0.deletingPathExtension().lastPathComponent.caseInsensitiveCompare(base) == .orderedSame
+            }
+            guard !alreadyBeside else { continue }
+            let stem: (URL) -> String = { $0.deletingPathExtension().lastPathComponent.lowercased() }
+            let source = images.first { stem($0) == base.lowercased() }
+                ?? (games.count == 1 ? images.first { ["cover", "folder"].contains(stem($0)) } : nil)
+            guard let source else { continue }
+            let target = directory.appendingPathComponent("\(base).\(source.pathExtension.lowercased())")
+            if !fileManager.fileExists(atPath: target.path) { try? fileManager.copyItem(at: source, to: target) }
+        }
     }
 
     nonisolated private static func routeSave(
@@ -495,6 +641,9 @@ final class GameLibraryStore: ObservableObject {
             throw ROMFiles.Failure(message: String(localized: "3DS 存档需要包含 Nintendo 3DS 目录结构的 ZIP、7Z 或 RAR 包"))
         case .psp:
             throw ROMFiles.Failure(message: String(localized: "PSP 存档需要包含 PSP/SAVEDATA 目录结构的 ZIP、7Z 或 RAR 包"))
+        case .ps2:
+            // Not reachable today (only NDS/N64 are eligible above). PS2 saves go through the memory card page.
+            throw ROMFiles.Failure(message: String(localized: "PS2 存档请在该游戏的记忆卡页面导入 .psu 或 .max"))
         }
         try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
         if fileManager.fileExists(atPath: target.path) {
@@ -612,6 +761,11 @@ final class GameLibraryStore: ObservableObject {
                 try JSONEncoder().encode(manifest).write(to: manifestURL, options: .atomic)
             }
         } else {
+            if game.url.pathExtension.lowercased() == "cue" {
+                for track in ROMFiles.cueReferencedFiles(game.url) where fileManager.fileExists(atPath: track.path) {
+                    try fileManager.removeItem(at: track)
+                }
+            }
             try fileManager.removeItem(at: game.url)
         }
         reload()
@@ -693,6 +847,13 @@ final class GameLibraryStore: ObservableObject {
             }
             return makeSaveInfo(game: game, location: location, metadata: nil,
                                 additionalLocations: Array(sorted.dropFirst()))
+        case .ps2:
+            let root = Self.ps2MemoryCardRoot(for: game)
+            guard let saves = try? PS2MemoryCard(root: root).saves(), !saves.isEmpty else {
+                return GameSaveInfo(game: game, location: nil, metadataLocation: nil,
+                                    byteCount: 0, modifiedAt: nil)
+            }
+            return makeSaveInfo(game: game, location: root, metadata: nil)
         }
     }
 
@@ -718,6 +879,8 @@ final class GameLibraryStore: ObservableObject {
                 ?? "3ds:" + game.url.deletingPathExtension().lastPathComponent.lowercased()
         case .psp:
             return "psp:" + (game.productID?.lowercased() ?? game.url.deletingPathExtension().lastPathComponent.lowercased())
+        case .ps2:
+            return "ps2:" + Self.ps2MemoryCardRoot(for: game).lastPathComponent.lowercased()
         }
     }
 
@@ -812,6 +975,12 @@ private enum ROMMetadataReader {
             return ROMMetadata(title: title, detail: "Nintendo 64", cartridgeKind: .ndsStandard)
         case .psp:
             return readPSP(from: url)
+        case .ps2:
+            var serial: String?
+            if case .ps2(let found, _) = ROMFiles.ps2DiscKind(url) { serial = found }
+            // Cover art is resolved asynchronously by GameLibraryStore.
+            return ROMMetadata(title: url.deletingPathExtension().lastPathComponent,
+                               detail: serial ?? "PlayStation 2", cartridgeKind: .ps2Case, productID: serial)
         }
     }
 
@@ -1487,6 +1656,7 @@ enum CartridgeSceneFactory {
     // below are millimetres so the thickness and face proportions stay real.
     static func scene(for game: GameLibraryItem) -> SCNScene {
         if game.cartridgeKind == .umd { return umdScene(for: game) }
+        if game.cartridgeKind == .ps2Case { return ps2CaseScene(for: game) }
         let scene = SCNScene()
         scene.rootNode.name = game.id
 
@@ -1774,6 +1944,144 @@ enum CartridgeSceneFactory {
         return scene
     }
 
+    // MARK: PS2 case
+
+    private static let ps2CaseModel: SCNScene? = {
+        guard let url = Bundle.main.url(forResource: "PS2-Case", withExtension: "usdz") else { return nil }
+        return try? SCNScene(url: url)
+    }()
+
+    /// PS2-Case.usdz is in metres (Y-up, root at the bottom centre). The carousel works in DS-card
+    /// millimetres (UMDs are shown at 0.7×, ≈45 units); 300 units/m makes the 190 mm case 57 units
+    /// tall — about 1.25× a UMD, so it still fits one Cover Flow slot.
+    static let ps2CaseUnitsPerMetre: Float = 300
+
+    /// Closed PS2 case with the game's cover insert, wrapped as the shared `cartridgeModel` node.
+    static func ps2CaseScene(for game: GameLibraryItem) -> SCNScene {
+        let scene = SCNScene()
+        scene.rootNode.name = game.id
+        let model = SCNNode()
+        model.name = "cartridgeModel"
+        model.eulerAngles = SCNVector3(-0.05, -0.08, 0)
+        scene.rootNode.addChildNode(model)
+
+        let scale = ps2CaseUnitsPerMetre
+        if let caseNode = ps2CaseModel?.rootNode.childNode(withName: "PS2_CASE", recursively: false)?.clone() {
+            caseNode.scale = SCNVector3(scale, scale, scale)
+            caseNode.position = SCNVector3(0, -0.095 * scale, 0)  // centre the 190 mm height
+            applyPS2CoverInsert(ps2InsertTexture(for: game), to: caseNode)
+            model.addChildNode(caseNode)
+        } else {
+            let box = SCNBox(width: CGFloat(0.135 * scale), height: CGFloat(0.19 * scale),
+                             length: CGFloat(0.014 * scale), chamferRadius: 0.6)
+            let front = SCNMaterial()
+            front.diffuse.contents = ps2InsertTexture(for: game)
+            front.diffuse.contentsTransform = SCNMatrix4Mult(SCNMatrix4MakeScale(0.4744, 1, 1),
+                                                             SCNMatrix4MakeTranslation(0.5256, 0, 0))
+            let plastic = SCNMaterial()
+            plastic.diffuse.contents = UIColor(white: 0.06, alpha: 1)
+            box.materials = [front, plastic, plastic, plastic, plastic, plastic]
+            model.addChildNode(SCNNode(geometry: box))
+        }
+
+        let camera = SCNCamera()
+        camera.fieldOfView = 39
+        camera.zNear = 1
+        camera.zFar = 300
+        let cameraNode = SCNNode()
+        cameraNode.camera = camera
+        cameraNode.position = SCNVector3(0, 0, 130)
+        scene.rootNode.addChildNode(cameraNode)
+
+        let key = SCNLight()
+        key.type = .area
+        key.intensity = 1_900
+        let keyNode = SCNNode()
+        keyNode.light = key
+        keyNode.position = SCNVector3(-34, 44, 84)
+        keyNode.look(at: SCNVector3Zero)
+        scene.rootNode.addChildNode(keyNode)
+
+        let fill = SCNLight()
+        fill.type = .omni
+        fill.intensity = 950
+        let fillNode = SCNNode()
+        fillNode.light = fill
+        fillNode.position = SCNVector3(36, -24, 60)
+        scene.rootNode.addChildNode(fillNode)
+        return scene
+    }
+
+    /// Puts one insert texture on `COVER_ART`, `COVER_ART_SPINE` and `COVER_ART_BACK` (each has its own
+    /// material; their UVs pick back / spine / front out of the same 273 × 183 mm sheet).
+    static func applyPS2CoverInsert(_ texture: UIImage, to caseNode: SCNNode) {
+        for slot in ["COVER_ART", "COVER_ART_SPINE", "COVER_ART_BACK"] {
+            guard let node = caseNode.childNode(withName: slot, recursively: true) else { continue }
+            // USD import may put the geometry on a `NAME_mesh` child instead.
+            let targets = [node] + node.childNodes.filter { $0.name == slot + "_mesh" }
+            for target in targets {
+                guard let geometry = target.geometry?.copy() as? SCNGeometry else { continue }
+                geometry.materials = geometry.materials.map { original in
+                    let material = original.copy() as! SCNMaterial
+                    material.diffuse.contents = texture
+                    return material
+                }
+                target.geometry = geometry
+            }
+        }
+    }
+
+    private static let ps2InsertCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 24
+        return cache
+    }()
+
+    /// Insert sheet (273 × 183 mm, laid out back | spine | front as seen from outside): the cover,
+    /// aspect-filled and centre-cropped to the 129.5 × 183 mm front, with its dominant colour extended
+    /// over the spine and back. Without a cover, a blank insert carrying the title.
+    static func ps2InsertTexture(for game: GameLibraryItem) -> UIImage {
+        let key = "\(game.id)|\(game.appearanceRevision)" as NSString
+        if let cached = ps2InsertCache.object(forKey: key) { return cached }
+        // 0.6 px/0.1 mm keeps the front (777 px wide) above the 512 px source covers.
+        let size = CGSize(width: 1638, height: 1098)
+        let frontRect = CGRect(x: (size.width * 0.5256).rounded(), y: 0,
+                               width: size.width - (size.width * 0.5256).rounded(), height: size.height)
+        let cover = game.icon?.cgImage.flatMap { image -> (front: CGImage, color: UIColor)? in
+            let crop = PS2CoverResolver.frontCropRect(imageSize: CGSize(width: image.width, height: image.height))
+            guard let front = image.cropping(to: crop) else { return nil }
+            let c = PS2CoverResolver.dominantColor(of: image)
+            return (front, UIColor(red: c.r, green: c.g, blue: c.b, alpha: 1))
+        }
+        // An explicit sRGB RGBA context: UIGraphicsImageRenderer may pick a one-channel backing store
+        // for grey-only drawing (the blank insert), which SceneKit's Metal path rejects.
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: space,
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return UIImage() }
+        ctx.translateBy(x: 0, y: size.height)
+        ctx.scaleBy(x: 1, y: -1)
+        UIGraphicsPushContext(ctx)
+        (cover?.color ?? UIColor(white: 0.93, alpha: 1)).setFill()
+        ctx.fill(CGRect(origin: .zero, size: size))
+        if let cover {
+            UIImage(cgImage: cover.front).draw(in: frontRect)
+        } else {
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            (game.title as NSString).draw(
+                in: frontRect.insetBy(dx: 70, dy: 0).offsetBy(dx: 0, dy: size.height * 0.42),
+                withAttributes: [.font: UIFont.systemFont(ofSize: 64, weight: .bold),
+                                 .foregroundColor: UIColor(white: 0.18, alpha: 1),
+                                 .paragraphStyle: paragraph])
+        }
+        UIGraphicsPopContext()
+        guard let rendered = ctx.makeImage() else { return UIImage() }
+        let texture = UIImage(cgImage: rendered)
+        ps2InsertCache.setObject(texture, forKey: key)
+        return texture
+    }
+
     private static let labelImageContext = CIContext(options: [.cacheIntermediates: false])
 
     private static func dominantArtworkColor(_ icon: UIImage) -> UIColor {
@@ -1923,7 +2231,7 @@ enum CartridgeSceneFactory {
         switch kind {
         case .threeDS, .dsiExclusive, .umd: shellColor = UIColor(white: 0.84, alpha: 1)
         case .ndsInfrared: shellColor = UIColor(red: 0.085, green: 0.11, blue: 0.105, alpha: 0.94)
-        case .ndsStandard, .dsiEnhanced: shellColor = UIColor(white: 0.20, alpha: 1)
+        case .ndsStandard, .dsiEnhanced, .ps2Case: shellColor = UIColor(white: 0.20, alpha: 1)
         }
         let front = SCNMaterial()
         front.diffuse.contents = shellColor

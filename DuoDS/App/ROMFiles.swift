@@ -9,7 +9,10 @@ enum ROMFiles {
     static let psp: Set<String> = ["iso", "cso", "chd", "pbp", "prx", "pspelf"]
     static let packages: Set<String> = ["cia", "zcia", "ciax"]
     static let saves: Set<String> = ["sav", "dsv", "srm", "ppst"]
-    static let accepted = archives.union(nds).union(threeDS).union(n64).union(psp).union(packages).union(saves).union(["bin", "o2r"])
+    /// Disc images whose platform (PS2 or PSP) is decided by content; `.bin` / `.cue` are PS2-only.
+    static let discImages: Set<String> = ["iso", "cso", "chd", "bin", "cue"]
+    static let ps2Only: Set<String> = ["bin", "cue"]
+    static let accepted = archives.union(nds).union(threeDS).union(n64).union(psp).union(packages).union(saves).union(["bin", "cue", "o2r"])
 
     static func isArchive(_ url: URL) -> Bool {
         let name = url.lastPathComponent.lowercased()
@@ -116,6 +119,17 @@ enum ROMFiles {
             }
             return "iso"
         }
+        if ext == "cue" {
+            guard case .ps2 = ps2DiscKind(url) else {
+                throw Failure(message: String(localized: "CUE 文件引用的 BIN 缺失，或不是 PS2 游戏光盘"))
+            }
+            return "cue"
+        }
+        // Raw 2352-byte sectors start with the CD sync pattern; only those can be PS2 BIN images.
+        if ext == "bin", h.count >= 12, h.prefix(12) == Data([0x00] + [UInt8](repeating: 0xff, count: 10) + [0x00]),
+           case .ps2 = ps2DiscKind(url) {
+            return "bin"
+        }
         if [[0x80,0x37,0x12,0x40], [0x37,0x80,0x40,0x12], [0x40,0x12,0x37,0x80]].contains(magic) {
             guard size >= 4096, size <= 128 * 1024 * 1024, size % 4 == 0 else { throw Failure(message: String(localized: "N64 ROM 大小异常或文件已截断")) }
             return "z64"
@@ -153,7 +167,60 @@ enum ROMFiles {
                arm9 + arm9Size <= size, arm7 + arm7Size <= size { return "nds" }
         }
         if ext == "o2r", magic == [0x50, 0x4b, 0x03, 0x04] { return "o2r" }
-        throw Failure(message: String(localized: "无法识别完整的 DS、3DS、N64 或 PSP 游戏内容（.\(ext)）；存档、补丁和 BIOS 不能当作游戏启动"))
+        throw Failure(message: String(localized: "无法识别完整的 DS、3DS、N64、PSP 或 PS2 游戏内容（.\(ext)）；存档、补丁和 BIOS 不能当作游戏启动"))
+    }
+
+    // MARK: PS2 / PSP disc content
+
+    private static let discKindCache = DiscKindCache()
+
+    /// `PS2DiscProbe.identify`, memoised per path + size + modification date (probing reads a few hundred KB).
+    static func ps2DiscKind(_ url: URL) -> PS2DiscKind {
+        let ext = url.pathExtension.lowercased()
+        guard discImages.contains(ext) else { return .unknown }
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+        var key = "\(url.standardizedFileURL.path)|\(values?.fileSize ?? -1)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)"
+        if ext == "cue" {
+            // A cue's answer depends on its data track too.
+            for file in cueReferencedFiles(url) {
+                let v = try? file.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                key += "|\(v?.fileSize ?? -1)|\(v?.contentModificationDate?.timeIntervalSince1970 ?? 0)"
+            }
+        }
+        if let cached = discKindCache.value(for: key) { return cached }
+        let kind = PS2DiscProbe.identify(url: url)
+        discKindCache.set(kind, for: key)
+        return kind
+    }
+
+    static func isPS2Disc(_ url: URL) -> Bool {
+        if case .ps2 = ps2DiscKind(url) { return true }
+        return false
+    }
+
+    /// Files named by a cue sheet's `FILE` lines, resolved next to the cue (existing or not).
+    static func cueReferencedFiles(_ cueURL: URL) -> [URL] {
+        guard let data = try? Data(contentsOf: cueURL), data.count <= 256 * 1024 else { return [] }
+        let text = String(decoding: data, as: UTF8.self)
+        let directory = cueURL.deletingLastPathComponent()
+        return text.components(separatedBy: .newlines).compactMap { raw -> URL? in
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            guard line.uppercased().hasPrefix("FILE ") else { return nil }
+            var rest = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            let name: String
+            if rest.hasPrefix("\"") {
+                rest.removeFirst()
+                guard let end = rest.firstIndex(of: "\"") else { return nil }
+                name = String(rest[..<end])
+            } else {
+                // Unquoted: drop the trailing file type (BINARY, MOTOROLA, …).
+                var parts = rest.split(separator: " ")
+                if parts.count > 1 { parts.removeLast() }
+                name = parts.joined(separator: " ")
+            }
+            let last = name.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
+            return last.isEmpty ? nil : directory.appendingPathComponent(last, isDirectory: false)
+        }
     }
 
     static func systemFilename(_ url: URL) -> String? {
@@ -214,5 +281,21 @@ enum ROMFiles {
         let copy = staging.appendingPathComponent(source.lastPathComponent)
         try fm.copyItem(at: source, to: copy)
         return [copy]
+    }
+}
+
+private final class DiscKindCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String: PS2DiscKind] = [:]
+
+    func value(for key: String) -> PS2DiscKind? {
+        lock.lock(); defer { lock.unlock() }
+        return storage[key]
+    }
+
+    func set(_ kind: PS2DiscKind, for key: String) {
+        lock.lock(); defer { lock.unlock() }
+        if storage.count > 512 { storage.removeAll() }
+        storage[key] = kind
     }
 }

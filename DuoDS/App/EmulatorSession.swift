@@ -437,6 +437,10 @@ final class EmulatorSession: NSObject, ObservableObject {
         let ext: String
         do { ext = try ROMFiles.canonicalExtension(romURL) }
         catch { launchError = error.localizedDescription; return }
+        // PS2 discs share .iso/.cso with PSP; there is no PS2 core yet, so never hand them to PPSSPP.
+        if ROMFiles.discImages.contains(ext), ROMFiles.isPS2Disc(romURL) {
+            launchError = String(localized: "PS2 模拟内核尚未接入"); return
+        }
         isN64 = ROMFiles.n64.contains(ext)
         isPSP = ROMFiles.psp.contains(ext)
         guard isN64 || isPSP || Self.threeDSExtensions.contains(ext) || ext == "nds" else {
@@ -839,6 +843,24 @@ final class EmulatorSession: NSObject, ObservableObject {
         } catch { preconditionFailure("PSP GPU state round trip: \(error)") }
     }
     #endif
+
+    enum PS2Stick { case left, right }
+
+    /// PS2 (DualShock 2) input by libretro joypad id: B=0 ×, Y=1 □, SELECT=2, START=3, UP…RIGHT=4…7,
+    /// A=8 ○, X=9 △, L=10 L1, R=11 R1, L2=12, R2=13, L3=14, R3=15. No-op until a core is running.
+    func setPS2Button(_ id: Int, pressed: Bool) {
+        guard isRunning, (0..<16).contains(id), !(pressed && isPaused) else { return }
+        azaharBridge.setJoypadID(UInt(id), pressed: pressed)
+    }
+
+    /// Analog values −1…1; +y is down (libretro convention).
+    func setPS2Analog(stick: PS2Stick, x: Double, y: Double) {
+        guard isRunning else { return }
+        switch stick {
+        case .left: azaharBridge.setCirclePadX(x, y: y)
+        case .right: azaharBridge.setRightAnalogX(x, y: y)
+        }
+    }
 
     func setPSPButton(_ code: Int, pressed: Bool) {
         guard backend == .psp, isRunning, !isPaused, let button = AzaharButton(rawValue: code) else { return }
