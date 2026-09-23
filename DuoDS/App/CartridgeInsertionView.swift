@@ -129,6 +129,8 @@ struct DragCartridgeSceneView: UIViewRepresentable {
         var ps2: PS2InsertionStage?
         var ps2Open: Float = 0
         var ps2Tray: Float?
+        /// PS2 exit pan: overrides the stage backdrop/lights visibility (0 = transparent stage).
+        var ps2StageVisibility: Float?
         var displayLink: CADisplayLink?
         var interactionDisplayLink: CADisplayLink?
         var pendingScroll: Float?
@@ -464,7 +466,7 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             let approaching = min(pull / 0.68, 1)
             let entry = max(0, (pull - 0.68) / 0.32)
             let active = mode == .pull || mode == .latching || (mode == .returning && pull > 0) || mode == .opening || mode == .finished || mode == .closing || mode == .ejecting || mode == .browsing
-            let stageVisibility = active ? max(0, 1 - pull * 4) : 1
+            let stageVisibility = ps2StageVisibility ?? (active ? max(0, 1 - pull * 4) : 1)
             stage.isHidden = stageVisibility == 0
             stageBackdrop.opacity = CGFloat(stageVisibility)
             stageBackdrop.position = SCNVector3(0, shelfY, isCircular ? -12 : -4)

@@ -547,7 +547,18 @@ struct ContentView: View {
         isExiting = true
         session.saveGame()
         if session.isRunning && !session.isPaused { session.togglePause() }
-        if activeGame?.platform == .psp {
+        if activeGame?.platform == .ps2, let runtime = PS2RuntimeModel.active {
+            // The game screen plays its half first (TV off, tray, disc flight); the library then
+            // continues from the same frame, or cross-fades in with Reduce Motion.
+            let reduceMotion = UIAccessibility.isReduceMotionEnabled
+            runtime.playExit(reduceMotion: reduceMotion) {
+                if reduceMotion {
+                    withAnimation(.easeInOut(duration: 0.3)) { libraryHidden = false }
+                } else {
+                    libraryHidden = false
+                }
+            }
+        } else if activeGame?.platform == .psp {
             // The insertion scene takes ownership of the actual runtime mesh in
             // this same update, so a second console never crossfades over it.
             libraryHidden = false
@@ -557,9 +568,11 @@ struct ContentView: View {
     }
     private func finishExit() {
         guard isExiting else { return }
-        if proEntitlement.isUnlocked { session.saveSnapshot(name: String(localized: "退出时安全快照"), automatic: true) }
+        // PS2 has no core yet, so the shared session is not running for it.
+        let usesSession = activeGame?.platform != .ps2
+        if proEntitlement.isUnlocked && usesSession { session.saveSnapshot(name: String(localized: "退出时安全快照"), automatic: true) }
         if let game = activeGame, let playStartedAt { proStore.recordPlay(game.url, seconds: Date().timeIntervalSince(playStartedAt)) }
-        session.stop()
+        if usesSession { session.stop() }
         DuoExternalDisplayCoordinator.shared.attach(session, enabled: false)
         activeGame = nil
         DuoOrientation.setPSPGameplay(false)
@@ -575,6 +588,7 @@ private struct GameSettingsView: View {
     @Binding var renderMode: DuoRenderMode
     @AppStorage("pspRenderMode") private var pspRenderMode = DuoRenderMode.hd
     @AppStorage("pspFrameRateMode") private var pspFrameRateMode = DuoPSPFrameRateMode.high
+    @AppStorage(PS2LibrarySettings.onlineCoversKey) private var ps2OnlineCovers = true
     let replayGuide: () -> Void
     let dismiss: () -> Void
 
@@ -622,6 +636,10 @@ private struct GameSettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Section(String(localized: "游戏库")) {
+                Toggle(String(localized: "自动下载 PS2 封面"), isOn: $ps2OnlineCovers)
+                Text(String(localized: "按游戏编号从社区封面库下载 PS2 封面。关闭后只使用本地图片或空白封面。"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 NavigationLink {
                     CartridgeManagementView(library: library)
                 } label: {
@@ -1423,7 +1441,7 @@ private struct EmulatorView: View {
                 .ignoresSafeArea()
 
             if game.platform == .ps2 {
-                PS2GameView(session: nil, title: game.title, cover: game.icon?.cgImage, onExitRequested: onExit)
+                PS2GameView(session: nil, game: game, title: game.title, cover: game.icon?.cgImage, onExitRequested: onExit)
             } else if session.isPSP {
                 PSPGameView(session: session, onExit: onExit)
             } else if session.isN64 {

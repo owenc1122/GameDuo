@@ -32,17 +32,15 @@ final class PS2CaseStage {
 
     init?(card: SCNNode, game: GameLibraryItem, parent: SCNNode) {
         guard let caseNode = card.childNode(withName: "PS2_CASE", recursively: true),
-              let dvd = PS2StageAssets.dvd?.clone(),
+              let dvd = Self.makeDisc(for: game),
               let memoryCard = PS2StageAssets.memoryCard?.clone() else { return nil }
         self.caseNode = caseNode
         spine = caseNode.childNode(withName: "CASE_SPINE", recursively: true)
         lid = caseNode.childNode(withName: "CASE_LID", recursively: true)
         discAnchor = caseNode.childNode(withName: "CASE_DISC_ANCHOR", recursively: true)
         disc = dvd
-        disc.name = "DUO_PS2_DISC"
         self.memoryCard = memoryCard
         memoryCard.name = "DUO_PS2_MEMORY_CARD"
-        Self.applyDiscLabel(Self.discLabelTexture(for: game), to: disc)
         parent.addChildNode(disc)
         parent.addChildNode(memoryCard)
     }
@@ -115,6 +113,14 @@ final class PS2CaseStage {
     }
 
     // MARK: Materials
+
+    /// A `PS2_DVD` clone printed with the game's label (the case's disc and the game screen's exit disc).
+    static func makeDisc(for game: GameLibraryItem) -> SCNNode? {
+        guard let disc = PS2StageAssets.dvd?.clone() else { return nil }
+        disc.name = "DUO_PS2_DISC"
+        applyDiscLabel(discLabelTexture(for: game), to: disc)
+        return disc
+    }
 
     /// Real covers (downloaded or local scans) already print the top "PlayStation 2" banner, so the
     /// model's lid banner is hidden then; a blank insert keeps it. Spine prints always stay.

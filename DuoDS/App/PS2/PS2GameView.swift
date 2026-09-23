@@ -117,6 +117,17 @@ final class PS2RuntimeModel: ObservableObject {
     private var viewportKey: [CGFloat] = []
     private var focalLength: CGFloat = 1
     private var viewSize: CGSize = .zero
+    /// Camera → console target distance (m), from the last viewport update.
+    private var cameraDistance: Float = 1
+    // Exit sequence state.
+    private var exitStarted = false
+    /// True once the game-screen part of the exit (CRT, eject, disc flight) has finished and
+    /// the library may take over (`makeExitHandoff()`).
+    private(set) var exitReady = false
+    private(set) var exitDisc: SCNNode?
+    private var exitDiscFlown = false
+    private var exitAnimation: PS2FrameAnimation?
+    private var exitCameraBase: simd_float4x4?
 
     static let backgroundColor = UIColor(red: 0.035, green: 0.038, blue: 0.047, alpha: 1)
     private static let green = UIColor(red: 0.235, green: 1, blue: 0.42, alpha: 1)   // #3CFF6B
@@ -386,6 +397,7 @@ final class PS2RuntimeModel: ObservableObject {
         // Console size in the gap: a fraction of the width, bounded by the gap height.
         let consoleWidth = max(60, min(gap.width * 0.40, gap.height * 1.45, 360))
         let distance = Float(0.301 * f / consoleWidth)
+        cameraDistance = distance
         let target = SIMD3<Float>(0.0005, 0.039, 0)
         let elevation: Float = 13 * .pi / 180
         let azimuth: Float = -16 * .pi / 180
@@ -530,6 +542,142 @@ final class PS2RuntimeModel: ObservableObject {
                            elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
     }
 
+    // MARK: Exit
+
+    /// The game-screen half of leaving a game: the top screen switches off like an old TV, the
+    /// distant console ejects its tray and the disc lifts off and flies up to the camera. Then
+    /// `completion` runs and the library continues from `makeExitHandoff()` (the view pans up
+    /// with the disc into its case). With Reduce Motion only the TV switches off.
+    func playExit(reduceMotion: Bool, completion: @escaping () -> Void) {
+        guard !exitStarted else { return }
+        exitStarted = true
+        controlsLocked = true
+        PS2Feedback.shared.prepare()
+        crt.play { [weak self] in
+            guard let self else { return }
+            guard !reduceMotion, let disc = self.exitDisc, self.consoleView != nil else {
+                self.exitReady = true
+                completion()
+                return
+            }
+            self.ejectDisc(disc, completion: completion)
+        }
+    }
+
+    /// Puts the game's disc on the closed tray, inside the console (it is drawn, and its
+    /// materials compiled, from the first frame, so the eject never stalls).
+    func seatDisc(for game: GameLibraryItem?) {
+        guard exitDisc == nil, let game, let anchor = trayDiscAnchor,
+              let disc = PS2CaseStage.makeDisc(for: game) else { return }
+        disc.simdTransform = matrix_identity_float4x4
+        anchor.addChildNode(disc)
+        exitDisc = disc
+    }
+
+    private func ejectDisc(_ disc: SCNNode, completion: @escaping () -> Void) {
+        renderRequest?(4)
+        setEjectBlinking(true)
+        PS2Feedback.shared.playTrayEject()
+        setTrayOpen(1, duration: 0.9)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(0.95))
+            guard let self else { return }
+            self.setEjectBlinking(false)
+            self.flyDisc(disc, completion: completion)
+        }
+    }
+
+    /// Where the flight ends, in camera space: large, in the upper middle of the view, label
+    /// upright and leaning back slightly (seen a little from above, as it left the tray).
+    private func exitFlightTarget(scale: Float) -> simd_float4x4 {
+        let diameter = Float(min(viewSize.width * 0.64, viewSize.height * 0.42))
+        let f = Float(focalLength)
+        let depth = 0.12 * scale * f / max(1, diameter)
+        let point = CGPoint(x: viewSize.width / 2, y: viewSize.height * 0.36)
+        let local = SIMD3<Float>(Float(point.x - viewSize.width / 2) / f * depth,
+                                 -Float(point.y - viewSize.height / 2) / f * depth, -depth)
+        // Disc +Y (label) → camera +Z, label top (disc −Z) → camera +Y, then a slight lean back.
+        let rotation = simd_quatf(angle: .pi / 2 - 0.2, axis: SIMD3(1, 0, 0))
+        return PS2Pose.compose(local, rotation, scale)
+    }
+
+    private func flyDisc(_ disc: SCNNode, completion: @escaping () -> Void) {
+        let camera = consoleCameraNode
+        let start = disc.simdWorldTransform
+        disc.removeFromParentNode()
+        disc.simdTransform = start
+        consoleScene.rootNode.addChildNode(disc)
+        let (_, _, scale) = PS2Pose.decompose(start)
+        let lifted = simd_float4x4(translation: SIMD3(0, 0.035, 0)) * start
+        let liftedLocal = camera.simdWorldTransform.inverse * lifted
+        let target = exitFlightTarget(scale: scale)
+        let (p0, r0, _) = PS2Pose.decompose(liftedLocal)
+        let (p1, r1, _) = PS2Pose.decompose(target)
+        let d0 = max(0.001, -p0.z), d1 = max(0.001, -p1.z)
+        // Screen position and log-depth are interpolated, so the disc grows at an even rate.
+        let s0 = SIMD2(p0.x / d0, p0.y / d0), s1 = SIMD2(p1.x / d1, p1.y / d1)
+        let liftDuration = 0.28, flightDuration = 0.95
+        renderRequest?(liftDuration + flightDuration + 0.3)
+        exitAnimation = PS2FrameAnimation(duration: liftDuration + flightDuration, update: { [weak self] elapsed in
+            guard let self else { return }
+            if elapsed < liftDuration {
+                let t = Float(Self.smooth(elapsed / liftDuration))
+                disc.simdWorldTransform = PS2Pose.blend(start, lifted, t)
+                return
+            }
+            if !self.foregroundHidden {
+                self.foregroundHidden = true
+                SCNTransaction.begin()
+                SCNTransaction.animationDuration = 0.3
+                self.cableNode.opacity = 0
+                SCNTransaction.commit()
+            }
+            let t = Float(Self.smooth((elapsed - liftDuration) / flightDuration))
+            let depth = d0 * pow(d1 / d0, t)
+            let screen = s0 + (s1 - s0) * t
+            // A little arc: the disc rises above the straight line before settling.
+            let arc = sin(.pi * t) * 0.05
+            let position = SIMD3<Float>(screen.x * depth, (screen.y + arc) * depth, -depth)
+            let local = PS2Pose.compose(position, simd_slerp(r0, r1, t), scale)
+            disc.simdWorldTransform = camera.simdWorldTransform * local
+        }, completion: { [weak self] in
+            guard let self else { return }
+            self.exitAnimation = nil
+            self.exitDiscFlown = true
+            self.exitReady = true
+            self.renderRequest?(30)
+            completion()
+        })
+    }
+
+    private static func smooth(_ x: Double) -> Double {
+        let t = min(max(x, 0), 1)
+        return t * t * (3 - 2 * t)
+    }
+
+    /// Library pan: moves the camera up so everything at the console's depth slides down by
+    /// `points`, and fades the backdrop to black. The exit disc stays where it is on screen.
+    func setExitPan(points: CGFloat, fade: CGFloat) {
+        if exitCameraBase == nil {
+            exitCameraBase = consoleCameraNode.simdTransform
+            if let disc = exitDisc {
+                let world = disc.simdWorldTransform
+                consoleCameraNode.addChildNode(disc)
+                disc.simdWorldTransform = world
+            }
+        }
+        guard let base = exitCameraBase else { return }
+        let rise = Float(points) * cameraDistance / Float(max(1, focalLength))
+        consoleCameraNode.simdTransform = base * simd_float4x4(translation: SIMD3(0, rise, 0))
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        Self.backgroundColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let k = 1 - min(max(fade, 0), 1)
+        let color = UIColor(red: r * k, green: g * k, blue: b * k, alpha: 1)
+        consoleScene.background.contents = color
+        consoleScene.fogColor = color
+        renderRequest?(0.2)
+    }
+
     // MARK: Exit hand-off
 
     func makeExitHandoff() -> PS2ExitHandoff? {
@@ -537,9 +685,69 @@ final class PS2RuntimeModel: ObservableObject {
               let anchor = trayDiscAnchor else { return nil }
         return PS2ExitHandoff(model: self, view: view, scene: consoleScene, cameraNode: consoleCameraNode,
                               console: console, discTray: tray, trayRestPosition: trayRestPosition,
-                              trayDiscAnchor: anchor,
+                              trayDiscAnchor: anchor, disc: exitDisc,
                               screenRect: view.convert(screenRect, to: nil),
                               consoleRect: view.convert(consoleScreenRect, to: nil))
+    }
+
+    /// The exit disc as the camera sees it: window position of its centre, points per local
+    /// unit at its depth, and its orientation relative to the camera.
+    fileprivate func exitDiscPose() -> PS2ExitDiscPose? {
+        guard exitDiscFlown, let disc = exitDisc, let view = consoleView, !disc.isHidden else { return nil }
+        let world = disc.simdWorldTransform
+        let local = consoleCameraNode.simdWorldTransform.inverse * world
+        let (position, rotation, scale) = PS2Pose.decompose(local)
+        let depth = -position.z
+        guard depth > 0.001 else { return nil }
+        let center = project(SIMD3(world.columns.3.x, world.columns.3.y, world.columns.3.z)).point
+        return PS2ExitDiscPose(windowCenter: view.convert(center, to: nil),
+                               pointsPerUnit: CGFloat(scale) * focalLength / CGFloat(depth),
+                               rotation: rotation)
+    }
+}
+
+/// The flying exit disc in screen terms, so an orthographic scene can draw it identically.
+struct PS2ExitDiscPose {
+    var windowCenter: CGPoint
+    /// Screen points per disc-local unit (metre).
+    var pointsPerUnit: CGFloat
+    /// Orientation relative to the camera (camera looks down −Z, +Y up).
+    var rotation: simd_quatf
+}
+
+/// Drives a closure every display frame for `duration` seconds (elapsed time, not eased).
+@MainActor
+final class PS2FrameAnimation: NSObject {
+    private var link: CADisplayLink?
+    private let start = CACurrentMediaTime()
+    private let duration: Double
+    private let update: (Double) -> Void
+    private let completion: () -> Void
+
+    init(duration: Double, update: @escaping (Double) -> Void, completion: @escaping () -> Void) {
+        self.duration = duration
+        self.update = update
+        self.completion = completion
+        super.init()
+        let link = CADisplayLink(target: self, selector: #selector(tick))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 60, preferred: 60)
+        link.add(to: .main, forMode: .common)
+        self.link = link
+        update(0)
+    }
+
+    @objc private func tick() {
+        let elapsed = min(CACurrentMediaTime() - start, duration)
+        update(elapsed)
+        guard elapsed >= duration else { return }
+        link?.invalidate()
+        link = nil
+        completion()
+    }
+
+    func cancel() {
+        link?.invalidate()
+        link = nil
     }
 }
 
@@ -556,9 +764,14 @@ struct PS2ExitHandoff {
     let discTray: SCNNode
     let trayRestPosition: SCNVector3
     let trayDiscAnchor: SCNNode
+    /// The disc that flew out of the tray (nil when the flight was skipped).
+    let disc: SCNNode?
     /// Top game screen and projected console bounds, in window coordinates.
     let screenRect: CGRect
     let consoleRect: CGRect
+
+    /// The exit disc's current on-screen pose (nil without a visible disc).
+    var discPose: PS2ExitDiscPose? { model.exitDiscPose() }
 
     func windowPoint(of world: SCNVector3) -> CGPoint {
         let p = view.projectPoint(world)
@@ -827,14 +1040,17 @@ private struct PS2SessionFrameForwarder: View {
 /// to exit), the DualShock 2 at the bottom with a live cable to the console.
 struct PS2GameView: View {
     private let session: EmulatorSession?
+    private let game: GameLibraryItem?
     private let title: String
     private let cover: CGImage?
     private let onExitRequested: () -> Void
     @StateObject private var model: PS2RuntimeModel
 
-    init(session: EmulatorSession?, title: String, cover: CGImage?, model: PS2RuntimeModel? = nil,
-         onExitRequested: @escaping () -> Void) {
+    /// `game` prints the disc that sits in the console and flies back to its case on exit.
+    init(session: EmulatorSession?, game: GameLibraryItem? = nil, title: String, cover: CGImage?,
+         model: PS2RuntimeModel? = nil, onExitRequested: @escaping () -> Void) {
         self.session = session
+        self.game = game
         self.title = title
         self.cover = cover
         self.onExitRequested = onExitRequested
@@ -887,7 +1103,10 @@ struct PS2GameView: View {
         .background(Color(PS2RuntimeModel.backgroundColor).ignoresSafeArea())
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
-        .onAppear { PS2RuntimeModel.active = model }
+        .onAppear {
+            PS2RuntimeModel.active = model
+            model.seatDisc(for: game)
+        }
         .onDisappear {
             if PS2RuntimeModel.active === model { PS2RuntimeModel.active = nil }
             session?.releaseAllInputs()

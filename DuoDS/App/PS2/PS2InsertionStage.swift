@@ -29,6 +29,8 @@ final class PS2InsertionStage {
 
     let caseStage: PS2CaseStage
     var target = PS2PullTarget.disc
+    /// Leaving a game: the disc travels from `start` (world) to its rest in the case.
+    var discReturn: (start: simd_float4x4, progress: Float)?
     private let consoleRoot = SCNNode()
     private let console: SCNNode?
     private let tray: SCNNode?
@@ -153,6 +155,8 @@ final class PS2InsertionStage {
             var pose = approach < 1 ? PS2Pose.blend(discRest, above, lift) : PS2Pose.blend(above, anchor, entry)
             pose.columns.3.z += travelLift
             caseStage.disc.simdTransform = pose
+        } else if let discReturn {
+            caseStage.disc.simdTransform = PS2Pose.blend(discReturn.start, discRest, discReturn.progress)
         } else {
             caseStage.disc.simdTransform = discRest
         }
@@ -405,10 +409,20 @@ extension DragCartridgeSceneView.Coordinator {
         })
     }
 
-    /// Leaving the game (basic reverse; the game-screen handoff comes later): the tray ejects, the
-    /// disc flies back into the case, the console sinks and the lid snaps shut.
+    /// Leaving the game. Normally the game screen has already switched off and flown the disc up to
+    /// the camera (`PS2RuntimeModel.playExit`); the view then pans up with it into the open case
+    /// and the lid snaps shut. Reduce Motion: the case appears with the disc inside and closes.
+    /// Without a game-screen handoff: the library's own console ejects the disc (basic reverse).
     func reversePS2Insertion() {
         guard mode == .finished, let ps2 else { return }
+        if let runtime = PS2RuntimeModel.active, runtime.exitReady {
+            if !reduceMotion, let view, let handoff = runtime.makeExitHandoff(), let pose = handoff.discPose {
+                panPS2Exit(handoff: handoff, pose: pose, stage: ps2, in: view)
+            } else {
+                closePS2CaseAfterExit(stage: ps2)
+            }
+            return
+        }
         mode = .closing
         pull = 1
         ps2Open = 1
@@ -442,6 +456,81 @@ extension DragCartridgeSceneView.Coordinator {
                 })
             })
         })
+    }
+
+    /// The camera pans up by one screen height with the disc, which starts exactly where the game
+    /// screen showed it and settles on the case's disc anchor; the game view pans in step below.
+    private func panPS2Exit(handoff: PS2ExitHandoff, pose: PS2ExitDiscPose, stage ps2: PS2InsertionStage, in view: SCNView) {
+        mode = .closing
+        pull = 0
+        ps2Open = 1
+        ps2Tray = nil
+        ps2StageVisibility = 0
+        layout()
+        let size = view.bounds.size
+        let unitsPerPoint = fullHeight / Float(size.height)
+        let baseY = cameraNode.position.y
+        let drop = Float(size.height) * unitsPerPoint
+        cameraNode.position.y = baseY - drop
+        // The library draws over the still-running game view until the pan has moved it away.
+        view.backgroundColor = .clear
+        view.isOpaque = false
+        let center = view.convert(pose.windowCenter, from: nil)
+        let rest = ps2.caseStage.discRestTransform
+        let position = SIMD3<Float>(cameraNode.position.x + Float(center.x - size.width / 2) * unitsPerPoint,
+                                    cameraNode.position.y - Float(center.y - size.height / 2) * unitsPerPoint,
+                                    rest.columns.3.z + 3)
+        let start = PS2Pose.compose(position, pose.rotation, Float(pose.pointsPerUnit) * unitsPerPoint)
+        ps2.discReturn = (start, 0)
+        layout()
+        // Show the library once it has drawn the disc in place, and retire the game's disc in the
+        // same frame (overlapping, the two transparent hubs would flash).
+        view.alpha = 0
+        let points = size.height
+        PS2Feedback.shared.prepare()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            view.alpha = 1
+            handoff.disc?.isHidden = true
+            self.animate(duration: 1.05, update: { t in
+                self.cameraNode.position.y = baseY - drop * (1 - t)
+                handoff.model.setExitPan(points: points * CGFloat(t), fade: CGFloat(t))
+                // The disc leads and the view follows it up, catching up as it settles.
+                ps2.discReturn = (start, self.smoothstep(0, 0.82, t))
+                self.layout()
+            }, completion: {
+                self.cameraNode.position.y = baseY
+                ps2.discReturn = nil
+                view.backgroundColor = .black
+                view.isOpaque = true
+                self.layout()
+                self.closePS2CaseAfterExit(stage: ps2, delay: 0.08)
+            })
+        }
+    }
+
+    /// The open case (disc inside) closes — lid, then spine — and returns to its Cover Flow pose.
+    private func closePS2CaseAfterExit(stage ps2: PS2InsertionStage, delay: TimeInterval? = nil) {
+        mode = .caseClosing
+        pull = 0
+        ps2Open = 1
+        ps2Tray = nil
+        ps2StageVisibility = 0
+        layout()
+        PS2Feedback.shared.prepare()
+        DispatchQueue.main.asyncAfter(deadline: .now() + (delay ?? 0.3)) {
+            self.animate(duration: self.reduceMotion ? 0.25 : 0.55, update: { t in
+                self.ps2Open = 1 - t
+                self.ps2StageVisibility = t
+                self.layout()
+            }, completion: {
+                PS2Feedback.shared.playCaseClose()
+                self.ps2StageVisibility = nil
+                self.finishPS2Close()
+                self.scroll = Float(self.selection)
+                self.layout()
+                self.owner.onReturned()
+            })
+        }
     }
 
     // MARK: Accessibility
