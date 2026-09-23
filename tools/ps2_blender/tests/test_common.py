@@ -153,6 +153,80 @@ def load_contract_merges_parts():
                  'layout': {'a': 1, 'b': 3}, 'tray_travel_m': 0.1, 'name': 'PS2-X'}, c
 
 
+@test
+def apply_all_copies_shared_data_and_fixes_negative_scale():
+    C.reset_scene()
+    a = C.rounded_box('A', (0.1, 0.1, 0.1), 0)
+    b = bpy.data.objects.new('B', a.data)
+    bpy.context.scene.collection.objects.link(b)
+    a.scale = (-2, 1, 1)
+    C.apply_all(a)
+    assert a.data is not b.data
+    assert close(bbox_size(b), (0.1, 0.1, 0.1)) and close(bbox_size(a), (0.2, 0.1, 0.1))
+    assert all(p.normal.dot(p.center) > 0 for p in a.data.polygons), 'normals flipped inward'
+
+
+@test
+def subdivision_is_baked_at_render_level():
+    from pxr import Usd, UsdGeom
+    C.reset_scene()
+    root = C.empty('SUB_ROOT')
+    cube = C.rounded_box('SUB_CUBE', (0.1, 0.1, 0.1), 0)
+    C.set_parent(cube, root)
+    sub = cube.modifiers.new('Subsurf', 'SUBSURF')
+    sub.levels, sub.render_levels = 0, 2
+    assert C.triangle_count(cube) == 6 * 16 * 2 == 192
+    # A live boolean cutter parented under the root is skipped, not exported.
+    cutter = C.cylinder('SUB_CUTTER', 0.01, 0.3)
+    C.set_parent(cutter, root)
+    C.boolean(cube, cutter, apply=False)
+    tris = C.triangle_count(cube)
+    path = C.export_usdz(root, OUT / 'test_subsurf.usdz')
+    stage = Usd.Stage.Open(str(path))
+    mesh = UsdGeom.Mesh(stage.GetPrimAtPath('/SUB_ROOT/SUB_CUBE'))
+    counts = mesh.GetFaceVertexCountsAttr().Get()
+    assert set(counts) == {3} and len(counts) == tris > 192, (len(counts), tris)
+    assert mesh.GetSubdivisionSchemeAttr().Get() == 'none'
+    assert not stage.GetPrimAtPath('/SUB_ROOT/SUB_CUTTER')
+
+
+@test
+def export_rejects_bad_roots_and_unhides():
+    C.reset_scene()
+    root = C.empty('R', location=(0.01, 0, 0))
+    try:
+        C.export_usdz(root, OUT / 'bad.usdz')
+        raise AssertionError('root off origin accepted')
+    except ValueError:
+        pass
+    root.location = (0, 0, 0)
+    hidden = C.rounded_box('HIDDEN', (0.01, 0.01, 0.01), 0)
+    C.set_parent(hidden, root)
+    hidden.hide_viewport = True
+    hidden.hide_set(True)
+    from pxr import Usd
+    stage = Usd.Stage.Open(str(C.export_usdz(root, OUT / 'test_hidden.usdz')))
+    assert stage.GetPrimAtPath('/R/HIDDEN'), 'viewport-hidden object dropped'
+    hidden.hide_render = True
+    try:
+        C.export_usdz(root, OUT / 'bad.usdz')
+        raise AssertionError('hide_render descendant accepted')
+    except ValueError:
+        pass
+
+
+@test
+def opacity_fix_raises_for_missing_material():
+    from pxr import Usd
+    C.reset_scene()
+    obj = C.assign(C.rounded_box('GLASSY', (0.01, 0.01, 0.01), 0), C.mat('Glassy', (1, 1, 1, 1), alpha=0.5))
+    try:
+        C._fix_opacity(Usd.Stage.CreateInMemory(), [obj])
+        raise AssertionError('missing translucent material not reported')
+    except RuntimeError:
+        pass
+
+
 def build_export_scene():
     """ASSET_ROOT (origin) > BODY (mesh w/ children) > LID_PIVOT (empty) > LID;
     FRONT_MARKER sits 5 cm in front (+Z) and 1 cm above the origin."""

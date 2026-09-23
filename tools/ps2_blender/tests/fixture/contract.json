@@ -1,0 +1,54 @@
+{
+  "tolerance_mm": 0.5,
+  "assets": {
+    "FixtureGood": {
+      "file": "tools/ps2_blender/tests/out/fixture.usdz",
+      "root": "FIX_ROOT",
+      "size_mm": [100, 65, 104.5],
+      "max_tris": 100,
+      "nodes": ["FIX_BODY", "ONLY_FIXED_BY_CONTRACT_PART"],
+      "motions": [
+        {"node": "FIX_LID", "axis": "rot_x", "range_rad": [-1.2, 0]},
+        {"node": "FIX_LID", "axis": "loc_y", "range_m": [0, 0.02]}
+      ]
+    },
+    "FixtureBadCollision": {
+      "file": "tools/ps2_blender/tests/out/fixture_bad.usdz",
+      "root": "FIX_ROOT",
+      "size_mm": [100, 64.5, 104.5],
+      "max_tris": 100,
+      "nodes": ["FIX_BODY", "FIX_LID", "FIX_LATCH", "FIX_KNOB"],
+      "motions": [{"node": "FIX_LID", "axis": "loc_y", "range_m": [-0.01, 0]}]
+    },
+    "FixtureAllowTouchLeak": {
+      "file": "tools/ps2_blender/tests/out/fixture.usdz",
+      "root": "FIX_ROOT",
+      "nodes": ["FIX_LATCH"],
+      "motions": [{"node": "FIX_LATCH", "axis": "loc_y", "range_m": [-0.013, 0], "allow_touch": ["FIX_LID"]}]
+    },
+    "FixtureInside": {
+      "file": "tools/ps2_blender/tests/out/fixture.usdz",
+      "root": "FIX_ROOT",
+      "nodes": ["FIX_LATCH"],
+      "motions": [{"node": "FIX_LATCH", "axis": "loc_y", "range_m": [-0.03, 0]}]
+    },
+    "FixtureRestRotation": {
+      "file": "tools/ps2_blender/tests/out/fixture.usdz",
+      "root": "FIX_ROOT",
+      "nodes": ["FIX_KNOB"],
+      "motions": [{"node": "FIX_KNOB", "axis": "rot_z", "range_rad": [0, 0.5]}]
+    },
+    "FixtureAmbiguous": {
+      "file": "tools/ps2_blender/tests/out/fixture_dupe.usdz",
+      "root": "FIX_ROOT",
+      "nodes": ["FIX_LATCH"]
+    },
+    "FixtureMissing": {
+      "file": "tools/ps2_blender/tests/out/does_not_exist.usdz",
+      "root": "FIX_ROOT",
+      "size_mm": [100, 65, 104.5],
+      "max_tris": 100,
+      "nodes": ["FIX_BODY"]
+    }
+  }
+}

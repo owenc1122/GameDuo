@@ -256,9 +256,12 @@ def apply_all(obj):
     Location and rotation are never touched: for pivots/animated nodes the local
     transform is the runtime pivot and must survive. Children keep their world
     placement (their local transform is recomputed when the scale is removed).
+    Modifiers are baked at their RENDER result (same as export_usdz). Shared
+    mesh data is copied first; a negative scale also flips the face winding.
     Non-mesh objects are left unchanged."""
     if obj.type != 'MESH':
         return obj
+    _match_render(obj)
     bpy.context.view_layer.update()
     kids = {c: c.matrix_world.copy() for c in obj.children}
     if obj.modifiers:
@@ -272,7 +275,15 @@ def apply_all(obj):
         if old.users == 0:
             bpy.data.meshes.remove(old)
     if any(abs(s - 1.0) > 1e-9 for s in obj.scale):
+        if obj.data.users > 1:
+            obj.data = obj.data.copy()
         obj.data.transform(Matrix.Diagonal((*obj.scale, 1.0)))
+        if obj.scale[0] * obj.scale[1] * obj.scale[2] < 0:
+            bm = bmesh.new()
+            bm.from_mesh(obj.data)
+            bmesh.ops.reverse_faces(bm, faces=bm.faces)
+            bm.to_mesh(obj.data)
+            bm.free()
         obj.scale = (1.0, 1.0, 1.0)
     bpy.context.view_layer.update()
     for c, world in kids.items():
@@ -280,16 +291,28 @@ def apply_all(obj):
     return obj
 
 
+def _match_render(*objs):
+    """Make viewport evaluation equal RENDER evaluation (what export_usdz writes):
+    viewport subdivision levels = render levels, modifier viewport toggle =
+    render toggle. Persistent side effect on the modifiers."""
+    for o in objs:
+        for mod in getattr(o, 'modifiers', ()):
+            if mod.type in {'SUBSURF', 'MULTIRES'}:
+                mod.levels = mod.render_levels
+            mod.show_viewport = mod.show_render
+
+
 def triangle_count(objs):
-    """Triangles of the evaluated meshes (modifiers included). Accepts one object
-    or an iterable; non-mesh objects count 0. Use descendants(root) for a tree."""
+    """Triangles of the evaluated meshes exactly as export_usdz writes them
+    (modifiers at render settings, see _match_render). Accepts one object or an
+    iterable; non-mesh objects count 0. Use descendants(root) for a tree."""
     if isinstance(objs, bpy.types.Object):
         objs = [objs]
+    objs = [o for o in objs if o.type == 'MESH']
+    _match_render(*objs)
     dg = bpy.context.evaluated_depsgraph_get()
     total = 0
     for o in objs:
-        if o.type != 'MESH':
-            continue
         ev = o.evaluated_get(dg)
         me = ev.to_mesh()
         me.calc_loop_triangles()
@@ -299,23 +322,28 @@ def triangle_count(objs):
 
 
 # ---------------------------------------------------------------- export
-def _fix_opacity(stage, root):
+def _fix_opacity(stage, objs):
     # Blender 5.2 writes UsdPreviewSurface opacity = 1 even when the Principled
     # Alpha is < 1, so author it from the Blender material.
     from pxr import Sdf, Tf, UsdShade
     alpha = {}
-    for o in descendants(root):
+    for o in objs:
         for m in (o.data.materials if o.type == 'MESH' else ()):
             bsdf = m and m.node_tree and m.node_tree.nodes.get('Principled BSDF')
             if bsdf and bsdf.inputs['Alpha'].default_value < 1.0:
                 alpha[Tf.MakeValidIdentifier(m.name)] = bsdf.inputs['Alpha'].default_value
+    done = set()
     for prim in stage.Traverse():
         if prim.GetTypeName() != 'Shader' or prim.GetParent().GetName() not in alpha:
             continue
         shader = UsdShade.Shader(prim)
         if shader.GetIdAttr().Get() == 'UsdPreviewSurface':
-            a = alpha[prim.GetParent().GetName()]
-            shader.CreateInput('opacity', Sdf.ValueTypeNames.Float).Set(a)
+            name = prim.GetParent().GetName()
+            shader.CreateInput('opacity', Sdf.ValueTypeNames.Float).Set(alpha[name])
+            done.add(name)
+    missing = sorted(set(alpha) - done)
+    if missing:
+        raise RuntimeError(f'translucent materials without a UsdPreviewSurface in the stage: {missing}')
 
 
 def export_usdz(root, path):
@@ -323,23 +351,42 @@ def export_usdz(root, path):
 
     Y-up stage, metersPerUnit 1, root = defaultPrim, triangulated meshes,
     UsdPreviewSurface materials (opacity = Principled Alpha, emissiveColor =
-    Emission Color x Strength), RENDER-evaluated modifiers. Materials live in
-    the sibling scope /_materials. Side effect: a mesh object that has children
-    and whose data is named like the object gets its data renamed NAME_mesh.
-    Returns Path."""
+    Emission Color x Strength), RENDER-evaluated modifiers with subdivision
+    baked (export_subdivision='TESSELLATE'). Materials live in the sibling scope
+    /_materials. Raises ValueError if the root is not at the origin with an
+    identity transform, or if a descendant is hide_render / not in the view
+    layer (hide_viewport and hide_set are cleared). Boolean cutters referenced by
+    live modifiers are skipped. Side effects: _match_render() on the modifiers;
+    a mesh object that has children and whose data is named like the object gets
+    its data renamed NAME_mesh. Returns Path."""
     from pxr import Usd, UsdGeom, UsdUtils
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    if root.matrix_world != Matrix.Identity(4):
-        print(f'WARNING export_usdz: root {root.name} is not at the origin / identity')
-    for o in descendants(root):
+    bpy.context.view_layer.update()
+    if any(abs(a - b) > 1e-9 for ra, rb in zip(root.matrix_world, Matrix.Identity(4))
+           for a, b in zip(ra, rb)):
+        raise ValueError(f'export_usdz: root {root.name} must sit at the world origin '
+                         f'with an identity transform')
+    objs = descendants(root)
+    cutters = {m.object for o in objs for m in getattr(o, 'modifiers', ())
+               if m.type == 'BOOLEAN' and m.object}
+    objs = [o for o in objs if o not in cutters]  # live boolean cutters are never geometry
+    hidden = [o.name for o in objs if o.hide_render]
+    if hidden:
+        raise ValueError(f'export_usdz: hide_render objects would be dropped: {hidden}')
+    _match_render(*objs)
+    for o in objs:
         if o.type == 'MESH' and o.children and o.data.name == o.name:
             o.data.name = o.name + '_mesh'  # avoid NAME/NAME nodes in SceneKit
     bpy.ops.object.select_all(action='DESELECT')
-    for o in descendants(root):
+    for o in objs:
+        o.hide_viewport = False
         o.hide_set(False)
         o.select_set(True)
+    unselectable = [o.name for o in objs if not o.select_get()]
+    if unselectable:  # e.g. in an excluded/hidden collection
+        raise ValueError(f'export_usdz: objects not exportable (not in view layer): {unselectable}')
     bpy.context.view_layer.objects.active = root
     tmp = Path(tempfile.mkdtemp(prefix='ps2usd_'))
     try:
@@ -350,6 +397,7 @@ def export_usdz(root, path):
             evaluation_mode='RENDER', export_animation=False, export_lights=False,
             export_cameras=False, export_custom_properties=False,
             author_blender_name=False, triangulate_meshes=True,
+            export_subdivision='TESSELLATE',  # bake subsurf; BEST_MATCH writes the cage
             convert_orientation=False, convert_scene_units='METERS', meters_per_unit=1.0,
             root_prim_path='', merge_parent_xform=True, use_instancing=False,
             relative_paths=True)
@@ -358,7 +406,7 @@ def export_usdz(root, path):
         UsdGeom.SetStageMetersPerUnit(stage, 1.0)
         if stage.GetDefaultPrim().GetName() != root.name:
             raise RuntimeError(f'defaultPrim {stage.GetDefaultPrim().GetName()} != {root.name}')
-        _fix_opacity(stage, root)
+        _fix_opacity(stage, objs)
         stage.GetRootLayer().Save()
         if path.exists():
             path.unlink()
