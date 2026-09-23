@@ -842,7 +842,7 @@ extension PS2RuntimeModel {
         let point = view.convert(CGPoint(x: rect.midX, y: rect.midY), to: nil)
         var chain: [String] = []
         var hit = window.hitTest(point, with: nil)
-        let reachesConsole = hit === view
+        let reachesConsole = hit === view || (hit as? PS2ConsolePressForwarder)?.console === view
         while let current = hit, chain.count < 8 {
             chain.append(String(describing: type(of: current)).prefix(60).description)
             hit = current.superview
@@ -1053,6 +1053,39 @@ final class PS2ConsoleSCNView: SCNView {
     }
 }
 
+/// Forwards touches over the distant console to `PS2ConsoleSCNView`, which measures them in
+/// its own coordinates (`UITouch.location(in:)`) and runs the 1 s hold.
+final class PS2ConsolePressForwarder: UIView {
+    weak var console: PS2ConsoleSCNView?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isMultipleTouchEnabled = true
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { console?.touchesBegan(touches, with: event) }
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) { console?.touchesMoved(touches, with: event) }
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) { console?.touchesEnded(touches, with: event) }
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { console?.touchesCancelled(touches, with: event) }
+}
+
+private struct PS2ConsolePressArea: UIViewRepresentable {
+    let model: PS2RuntimeModel
+
+    func makeUIView(context: Context) -> PS2ConsolePressForwarder {
+        let view = PS2ConsolePressForwarder(frame: .zero)
+        view.console = model.consoleView as? PS2ConsoleSCNView
+        return view
+    }
+
+    func updateUIView(_ view: PS2ConsolePressForwarder, context: Context) {
+        view.console = model.consoleView as? PS2ConsoleSCNView
+    }
+}
+
 private struct PS2ConsoleSceneView: UIViewRepresentable {
     let model: PS2RuntimeModel
     let layout: PS2GameLayout
@@ -1249,6 +1282,15 @@ struct PS2GameView: View {
                         .position(x: region.midX, y: region.midY)
                         .opacity(model.foregroundHidden ? 0 : 1)
                         .allowsHitTesting(!model.foregroundHidden)
+
+                    // Above the controller: SwiftUI hands a touch to the topmost representable
+                    // whose frame contains it, and the controller's frame reaches past the console.
+                    let press = layout.consoleRect.insetBy(dx: -18, dy: -18)
+                    PS2ConsolePressArea(model: model)
+                        .frame(width: press.width, height: press.height)
+                        .position(x: press.midX, y: press.midY)
+                        .allowsHitTesting(!model.foregroundHidden && !model.controlsLocked)
+                        .accessibilityHidden(true)
 
                     if let session {
                         PS2SessionFrameForwarder(session: session, model: model)
