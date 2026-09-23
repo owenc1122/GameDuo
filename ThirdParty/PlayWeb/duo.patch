@@ -11,6 +11,108 @@ index 6d91e5f..164fbcc 100644
  #else
  	return std::make_unique<Framework::CStdStream>(imagePathString.c_str(), Framework::GetInputStdStreamMode<fs::path::string_type>());
  #endif
+diff --git a/Source/ISO9660/DirectoryRecord.cpp b/Source/ISO9660/DirectoryRecord.cpp
+index 22faacc..7691b5a 100644
+--- a/Source/ISO9660/DirectoryRecord.cpp
++++ b/Source/ISO9660/DirectoryRecord.cpp
+@@ -1,4 +1,6 @@
+ #include <string.h>
++#include <ctype.h>
++#include <algorithm>
+ #include "DirectoryRecord.h"
+ 
+ using namespace ISO9660;
+@@ -34,6 +36,50 @@ CDirectoryRecord::~CDirectoryRecord()
+ {
+ }
+ 
++bool CDirectoryRecord::ReadNext(Framework::CStream* stream, uint64& directorySize, CDirectoryRecord& record)
++{
++	static const uint64 sectorSize = 0x800;
++	//Directories are at most a few hundred sectors; this also bounds a corrupt size.
++	static const uint64 maxDirectorySize = 0x100000;
++	while(1)
++	{
++		uint64 position = stream->Tell();
++		uint64 limit = (directorySize != 0) ? directorySize : sectorSize;
++		if(position >= std::min(limit, maxDirectorySize)) return false;
++		uint8 length = stream->Read8();
++		if(stream->IsEOF()) return false;
++		if(length == 0)
++		{
++			if(directorySize == 0) return false;
++			stream->Seek(((position / sectorSize) + 1) * sectorSize, Framework::STREAM_SEEK_SET);
++			continue;
++		}
++		stream->Seek(position, Framework::STREAM_SEEK_SET);
++		record = CDirectoryRecord(stream);
++		if(directorySize == 0 && record.GetName()[0] == 0x00)
++		{
++			directorySize = record.GetDataLength();
++		}
++		return true;
++	}
++}
++
++bool CDirectoryRecord::NameMatches(const char* recordName, const char* name)
++{
++	auto baseLength = [](const char* text) {
++		const char* separator = strchr(text, ';');
++		return separator ? static_cast<size_t>(separator - text) : strlen(text);
++	};
++	size_t recordLength = baseLength(recordName);
++	size_t nameLength = baseLength(name);
++	if(recordLength != nameLength) return false;
++	for(size_t i = 0; i < nameLength; i++)
++	{
++		if(tolower(static_cast<unsigned char>(recordName[i])) != tolower(static_cast<unsigned char>(name[i]))) return false;
++	}
++	return true;
++}
++
+ uint8 CDirectoryRecord::GetLength() const
+ {
+ 	return m_length;
+diff --git a/Source/ISO9660/DirectoryRecord.h b/Source/ISO9660/DirectoryRecord.h
+index 768538f..4882f35 100644
+--- a/Source/ISO9660/DirectoryRecord.h
++++ b/Source/ISO9660/DirectoryRecord.h
+@@ -18,6 +18,13 @@ namespace ISO9660
+ 		uint32 GetPosition() const;
+ 		uint32 GetDataLength() const;
+ 
++		//Game Duo: reads the next record of a directory extent. Records never cross a 2048-byte
++		//sector; the rest of a sector is zero padding, so a zero length means "next sector", not
++		//"end of directory". directorySize is taken from the "." entry when it is 0.
++		static bool ReadNext(Framework::CStream*, uint64& directorySize, CDirectoryRecord&);
++		//Case-insensitive name comparison that ignores ";version" suffixes on either side.
++		static bool NameMatches(const char* recordName, const char* name);
++
+ 	private:
+ 		uint8 m_length = 0;
+ 		uint8 m_exLength = 0;
+diff --git a/Source/ISO9660/ISO9660.cpp b/Source/ISO9660/ISO9660.cpp
+index b71a3e5..494c712 100644
+--- a/Source/ISO9660/ISO9660.cpp
++++ b/Source/ISO9660/ISO9660.cpp
+@@ -60,13 +60,12 @@ bool CISO9660::GetFileRecord(CDirectoryRecord* record, const char* filename)
+ bool CISO9660::GetFileRecordFromDirectory(CDirectoryRecord* record, uint32 address, const char* filename)
+ {
+ 	CFile directory(m_blockProvider.get(), address * CBlockProvider::BLOCKSIZE);
++	uint64 directorySize = 0;
++	CDirectoryRecord entry;
+ 
+-	while(1)
++	while(CDirectoryRecord::ReadNext(&directory, directorySize, entry))
+ 	{
+-		CDirectoryRecord entry(&directory);
+-
+-		if(entry.GetLength() == 0) break;
+-		if(strnicmp(entry.GetName(), filename, strlen(filename))) continue;
++		if(!CDirectoryRecord::NameMatches(entry.GetName(), filename)) continue;
+ 
+ 		(*record) = entry;
+ 		return true;
 diff --git a/Source/Js_DiscImageDeviceStream.cpp b/Source/Js_DiscImageDeviceStream.cpp
 index 71d6051..376d74e 100644
 --- a/Source/Js_DiscImageDeviceStream.cpp
@@ -400,6 +502,36 @@ index 4fb63f8..2a0e5af 100644
 +	inline void CPadMan::CPadDataHandler<CPadMan::PADDATA80>::SetModeConfig(unsigned int)
 +	{
 +	}
+ }
+diff --git a/Source/iop/ioman/OpticalMediaDirectoryIterator.cpp b/Source/iop/ioman/OpticalMediaDirectoryIterator.cpp
+index 083ffac..5a1d1da 100644
+--- a/Source/iop/ioman/OpticalMediaDirectoryIterator.cpp
++++ b/Source/iop/ioman/OpticalMediaDirectoryIterator.cpp
+@@ -47,8 +47,11 @@ void COpticalMediaDirectoryIterator::SeekToNextEntry()
+ {
+ 	while(1)
+ 	{
+-		m_currentRecord = ISO9660::CDirectoryRecord(m_directoryStream);
+-		if(m_currentRecord.GetLength() == 0) break;
++		if(!ISO9660::CDirectoryRecord::ReadNext(m_directoryStream, m_directorySize, m_currentRecord))
++		{
++			m_currentRecord = ISO9660::CDirectoryRecord();
++			break;
++		}
+ 		const char* name = m_currentRecord.GetName();
+ 		// Skip unnecessary entries
+ 		if(name[0] == 0x00) continue;
+diff --git a/Source/iop/ioman/OpticalMediaDirectoryIterator.h b/Source/iop/ioman/OpticalMediaDirectoryIterator.h
+index 6d9534e..2d7abce 100644
+--- a/Source/iop/ioman/OpticalMediaDirectoryIterator.h
++++ b/Source/iop/ioman/OpticalMediaDirectoryIterator.h
+@@ -21,6 +21,7 @@ namespace Iop
+ 
+ 			ISO9660::CDirectoryRecord m_currentRecord;
+ 			Framework::CStream* m_directoryStream = nullptr;
++			uint64 m_directorySize = 0;
+ 		};
+ 	}
  }
 diff --git a/Source/ui_js/CMakeLists.txt b/Source/ui_js/CMakeLists.txt
 index cf3518e..49485ca 100644

@@ -18,6 +18,8 @@ and run inside a WKWebView, whose WebKit JIT compiles Play!'s recompiled MIPS co
   HLE pad manager.
 - `Source/iop/Iop_PadMan.*`: libpad protocol completed (mode/actuator info, button mask, port and
   slot counts, actuator direct → rumble), DualShock 2 mode table in the new-style pad buffer.
+- `Source/ISO9660/*`, `Source/iop/ioman/OpticalMediaDirectoryIterator.*`: directories longer than
+  one sector are read completely (sector padding is not the end); exact file name matching.
 - `Source/ui_js/Ps2VmJs.*`: asynchronous resume / frame-limit reload.
 - `Source/ui_js/CMakeLists.txt`: new sources, `--pre-js duo_pre.js`, pthread pool of 6.
 
