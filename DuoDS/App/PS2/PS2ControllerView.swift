@@ -389,7 +389,7 @@ final class PS2ControllerModel {
 @MainActor
 final class PS2ControllerTouchView: UIView {
     let model: PS2ControllerModel
-    weak var session: EmulatorSession?
+    weak var session: (any PS2InputSink)?
     var controlsLocked = false {
         didSet { if controlsLocked && !oldValue { cancelAllControls() } }
     }
@@ -937,7 +937,7 @@ final class PS2ShoulderButtonView: UIView {
 
 struct PS2ControllerView: UIViewRepresentable {
     let model: PS2ControllerModel
-    let session: EmulatorSession?
+    let session: (any PS2InputSink)?
     /// Body rectangle in this view's coordinates.
     let bodyRect: CGRect
     var controlsLocked = false

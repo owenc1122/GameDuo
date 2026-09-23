@@ -20,3 +20,6 @@ tools/ps2_tests/.build*/
 !/work/
 /work/*
 !/work/package_store_cores.py
+!/ThirdParty/
+/ThirdParty/*
+!/ThirdParty/PlayWeb/

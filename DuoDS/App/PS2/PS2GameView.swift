@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 import SceneKit
 import UIKit
 
@@ -110,6 +111,8 @@ final class PS2RuntimeModel: ObservableObject {
     let crt = PS2CRTShutdownController()
     /// 4:3 by default; set 16/9 for widescreen output.
     @Published var screenAspect: CGFloat = 4.0 / 3.0
+    /// The running PS2 core (Play! in WebKit), created when the game screen appears.
+    @Published private(set) var core: PS2WebCore?
     @Published var controlsLocked = false
     /// Fades the top screen and the controller away so the full-screen console view can be
     /// used alone (e.g. the disc flying toward the camera).
@@ -675,6 +678,8 @@ final class PS2RuntimeModel: ObservableObject {
         guard !exitStarted else { return }
         exitStarted = true
         controlsLocked = true
+        // Pause the VM and flush its memory card while the TV switches off.
+        core?.stop {}
         PS2Feedback.shared.prepare()
         crt.play { [weak self] in
             guard let self else { return }
@@ -685,6 +690,35 @@ final class PS2RuntimeModel: ObservableObject {
             }
             self.ejectDisc(disc, completion: completion)
         }
+    }
+
+    /// Boots the game in the PS2 core. DEBUG: `-ps2-core-elf <folder>` boots the first ELF in
+    /// that folder instead (its files are mounted as `host:`).
+    func startCore(for game: GameLibraryItem?) {
+        guard core == nil else { return }
+        var content: PS2WebCore.Content?
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let i = arguments.firstIndex(of: "-ps2-core-elf"), arguments.indices.contains(i + 1) {
+            let folder = URL(fileURLWithPath: arguments[i + 1], isDirectory: true)
+            let elf = (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?
+                .first { $0.lowercased().hasSuffix(".elf") }
+            let card = ROMFiles.supportDirectory().appendingPathComponent("PS2/MemoryCards/QA-ELF", isDirectory: true)
+            content = PS2WebCore.Content(disc: nil, elfFolder: folder, elfName: elf, memoryCard: card)
+        }
+        #endif
+        if content == nil, let game {
+            content = PS2WebCore.Content(disc: game.url, elfFolder: nil, elfName: nil,
+                                         memoryCard: GameLibraryStore.ps2MemoryCardRoot(for: game))
+        }
+        guard let content else { return }
+        let core = PS2WebCore(content: content)
+        self.core = core
+        core.start()
+    }
+
+    func tearDownCore() {
+        core?.tearDown()
     }
 
     /// Puts the game's disc on the closed tray, inside the console (it is drawn, and its
@@ -1120,19 +1154,22 @@ private struct PS2ConsoleSceneView: UIViewRepresentable {
 
 private struct PS2ScreenView: View {
     @ObservedObject var feed: PS2ScreenFeed
+    let core: PS2WebCore?
     let title: String
     let cover: CGImage?
 
     var body: some View {
         ZStack {
             Color.black
-            if let image = feed.image {
+            if let core {
+                PS2CoreScreen(core: core, placeholder: { status in AnyView(placeholder(status: status)) })
+            } else if let image = feed.image {
                 // PS2 output is stretched to the display aspect, like a TV.
                 Image(decorative: image, scale: 1)
                     .resizable()
                     .interpolation(.medium)
             } else {
-                placeholder
+                placeholder(status: String(localized: "等待 PS2 内核"))
             }
         }
         .clipped()
@@ -1141,7 +1178,7 @@ private struct PS2ScreenView: View {
         .allowsHitTesting(false)
     }
 
-    private var placeholder: some View {
+    private func placeholder(status: String) -> some View {
         GeometryReader { proxy in
             let size = proxy.size
             let coverHeight = size.height * 0.68
@@ -1182,7 +1219,7 @@ private struct PS2ScreenView: View {
                             ProgressView()
                                 .controlSize(.mini)
                                 .tint(.white.opacity(0.7))
-                            Text(String(localized: "等待 PS2 内核"))
+                            Text(status)
                                 .font(.system(size: max(11, min(15, size.height * 0.05)), weight: .medium))
                                 .foregroundStyle(.white.opacity(0.7))
                         }
@@ -1192,6 +1229,55 @@ private struct PS2ScreenView: View {
                 .padding(.horizontal, size.width * 0.06)
             }
             .frame(width: size.width, height: size.height)
+        }
+    }
+}
+
+/// The PS2 core's WebKit view once it has drawn a frame; the cover placeholder with the boot
+/// status before that (or the error when the core stopped).
+private struct PS2CoreScreen: View {
+    @ObservedObject var core: PS2WebCore
+    let placeholder: (String) -> AnyView
+
+    var body: some View {
+        ZStack {
+            PS2CoreWebView(webView: core.webView)
+                .opacity(core.hasFrame ? 1 : 0)
+            if !core.hasFrame {
+                placeholder(status)
+            } else if case .failed(let message) = core.state {
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(8)
+                    .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
+            }
+        }
+    }
+
+    private var status: String {
+        if case .failed(let message) = core.state { return message }
+        return String(localized: "正在启动…")
+    }
+}
+
+private struct PS2CoreWebView: UIViewRepresentable {
+    let webView: WKWebView
+
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .black
+        container.isUserInteractionEnabled = false
+        webView.frame = container.bounds
+        webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        container.addSubview(webView)
+        return container
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        if webView.superview !== view {
+            webView.frame = view.bounds
+            view.addSubview(webView)
         }
     }
 }
@@ -1268,14 +1354,14 @@ struct PS2GameView: View {
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
 
-                    PS2ScreenView(feed: model.screenFeed, title: title, cover: cover)
+                    PS2ScreenView(feed: model.screenFeed, core: model.core, title: title, cover: cover)
                         .ps2CRTShutdown(model.crt)
                         .frame(width: layout.screenRect.width, height: layout.screenRect.height)
                         .position(x: layout.screenRect.midX, y: layout.screenRect.midY)
                         .opacity(model.foregroundHidden ? 0 : 1)
                         .accessibilityLabel(title)
 
-                    PS2ControllerView(model: model.controller, session: session,
+                    PS2ControllerView(model: model.controller, session: model.core ?? session,
                                       bodyRect: layout.bodyRect.offsetBy(dx: -region.minX, dy: -region.minY),
                                       controlsLocked: model.controlsLocked)
                         .frame(width: region.width, height: region.height)
@@ -1308,6 +1394,7 @@ struct PS2GameView: View {
         .onAppear {
             PS2RuntimeModel.active = model
             model.seatDisc(for: game)
+            if session == nil { model.startCore(for: game) }
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-ps2-hittest-selftest") {
                 Task { @MainActor in
@@ -1322,6 +1409,7 @@ struct PS2GameView: View {
         .onDisappear {
             if PS2RuntimeModel.active === model { PS2RuntimeModel.active = nil }
             session?.releaseAllInputs()
+            model.tearDownCore()
         }
     }
 }

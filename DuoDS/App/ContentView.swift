@@ -83,9 +83,6 @@ struct ContentView: View {
                 }
             }
             if arguments.contains("-psp-model-preview") { DuoOrientation.setPSPGameplay(true) }
-            #if DEBUG
-            PS2WebSpike.runIfRequested()
-            #endif
             if arguments.contains("-psp-orientation-test") {
                 Task { @MainActor in
                     guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { exit(9) }

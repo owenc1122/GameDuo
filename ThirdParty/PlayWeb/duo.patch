@@ -1,0 +1,1012 @@
+diff --git a/Source/DiskUtils.cpp b/Source/DiskUtils.cpp
+index 6d91e5f..164fbcc 100644
+--- a/Source/DiskUtils.cpp
++++ b/Source/DiskUtils.cpp
+@@ -66,7 +66,7 @@ static std::unique_ptr<Framework::CStream> CreateImageStream(const fs::path& ima
+ 		return std::make_unique<Framework::CPosixFileStream>(imagePathString.c_str(), O_RDONLY);
+ 	}
+ #elif defined(__EMSCRIPTEN__)
+-	return std::make_unique<CJsDiscImageDeviceStream>();
++	return std::make_unique<CJsDiscImageDeviceStream>(imagePathString);
+ #else
+ 	return std::make_unique<Framework::CStdStream>(imagePathString.c_str(), Framework::GetInputStdStreamMode<fs::path::string_type>());
+ #endif
+diff --git a/Source/Js_DiscImageDeviceStream.cpp b/Source/Js_DiscImageDeviceStream.cpp
+index 71d6051..376d74e 100644
+--- a/Source/Js_DiscImageDeviceStream.cpp
++++ b/Source/Js_DiscImageDeviceStream.cpp
+@@ -1,8 +1,19 @@
+ #include "Js_DiscImageDeviceStream.h"
+ #include <stdexcept>
+ #include <cassert>
++#include <limits>
+ #include <emscripten.h>
+-#include <unistd.h>
++
++CJsDiscImageDeviceStream::CJsDiscImageDeviceStream(std::string path)
++    : m_path(std::move(path))
++{
++	double size = EM_ASM_DOUBLE({ return Module.duoDiscSize(UTF8ToString($0)); }, m_path.c_str());
++	if(size < 0)
++	{
++		throw std::runtime_error("Failed to open disc image file.");
++	}
++	m_size = static_cast<uint64>(size);
++}
+ 
+ void CJsDiscImageDeviceStream::Seek(int64 position, Framework::STREAM_SEEK_DIRECTION whence)
+ {
+@@ -15,12 +26,8 @@ void CJsDiscImageDeviceStream::Seek(int64 position, Framework::STREAM_SEEK_DIREC
+ 		m_position += position;
+ 		break;
+ 	case Framework::STREAM_SEEK_END:
+-	{
+-		uint32 positionLo = MAIN_THREAD_EM_ASM_INT({return Module.discImageDevice.getFileSize()});
+-		uint32 positionHi = MAIN_THREAD_EM_ASM_INT({return Module.discImageDevice.getFileSize() / 4294967296});
+-		m_position = static_cast<uint64>(positionLo) | (static_cast<uint64>(positionHi) << 32);
+-	}
+-	break;
++		m_position = m_size + position;
++		break;
+ 	}
+ }
+ 
+@@ -31,26 +38,18 @@ uint64 CJsDiscImageDeviceStream::Tell()
+ 
+ uint64 CJsDiscImageDeviceStream::Read(void* buffer, uint64 size)
+ {
+-	if(size == 0) return 0;
+-
++	if(size == 0 || m_position >= m_size) return 0;
++	if(m_position + size > m_size) size = m_size - m_position;
+ 	assert(size <= std::numeric_limits<uint32>::max());
+ 
+-	uint32 positionLow = static_cast<uint32>(m_position);
+-	uint32 positionHigh = static_cast<uint32>(m_position >> 32);
+-
+-	MAIN_THREAD_EM_ASM({
+-		let posLow = $1 >>> 0;
+-		let posHigh = $2 >>> 0;
+-		let position = posLow + (posHigh * 4294967296);
+-		Module.discImageDevice.read($0, position, $3);
+-	},
+-	                   buffer, positionLow, positionHigh, static_cast<uint32>(size));
+-	while(!MAIN_THREAD_EM_ASM_INT({return Module.discImageDevice.isDone()}))
++	double read = EM_ASM_DOUBLE({ return Module.duoDiscRead(UTF8ToString($0), $1, $2, $3); },
++	                            m_path.c_str(), buffer, static_cast<double>(m_position), static_cast<uint32>(size));
++	if(read < 0)
+ 	{
+-		usleep(100);
++		throw std::runtime_error("Failed to read disc image.");
+ 	}
+-	m_position += size;
+-	return size;
++	m_position += static_cast<uint64>(read);
++	return static_cast<uint64>(read);
+ }
+ 
+ uint64 CJsDiscImageDeviceStream::Write(const void*, uint64)
+@@ -60,7 +59,7 @@ uint64 CJsDiscImageDeviceStream::Write(const void*, uint64)
+ 
+ bool CJsDiscImageDeviceStream::IsEOF()
+ {
+-	throw std::runtime_error("Not supported.");
++	return m_position >= m_size;
+ }
+ 
+ void CJsDiscImageDeviceStream::Flush()
+diff --git a/Source/Js_DiscImageDeviceStream.h b/Source/Js_DiscImageDeviceStream.h
+index 0702672..0d66695 100644
+--- a/Source/Js_DiscImageDeviceStream.h
++++ b/Source/Js_DiscImageDeviceStream.h
+@@ -1,10 +1,15 @@
+ #pragma once
+ 
+ #include "Stream.h"
++#include <string>
+ 
++// Reads a disc image file from the host app. Game Duo: reads run synchronously on the calling
++// thread (a worker) through Module.duoDiscRead, with a block cache in duo_pre.js; each stream
++// knows its file so multi-file images (BIN/CUE) work.
+ class CJsDiscImageDeviceStream : public Framework::CStream
+ {
+ public:
++	explicit CJsDiscImageDeviceStream(std::string path);
+ 	virtual ~CJsDiscImageDeviceStream() = default;
+ 
+ 	void Seek(int64, Framework::STREAM_SEEK_DIRECTION) override;
+@@ -15,5 +20,7 @@ public:
+ 	void Flush() override;
+ 
+ private:
++	std::string m_path;
+ 	uint64 m_position = 0;
++	uint64 m_size = 0;
+ };
+diff --git a/Source/iop/IopBios.cpp b/Source/iop/IopBios.cpp
+index e6b722a..7b03a83 100644
+--- a/Source/iop/IopBios.cpp
++++ b/Source/iop/IopBios.cpp
+@@ -673,6 +673,28 @@ int32 CIopBios::LoadModuleFromPath(const char* path, uint32 loadAddress, bool ow
+ int32 CIopBios::LoadModuleFromAddress(uint32 modulePtr, uint32 loadAddress, bool ownsMemory)
+ {
+ 	CELF32 module(m_ram + modulePtr);
++#ifdef _IOP_EMULATE_MODULES
++	//Game Duo: homebrew loads its own pad drivers (ps2sdk freepad/freesio2, IOP module names
++	//"padman"/"sio2man") from EE memory. Use the HLE pad manager for them, like the BIOS ones.
++	{
++		const auto& header = module.GetHeader();
++		for(unsigned int i = 0; i < header.nSectHeaderCount; i++)
++		{
++			auto sectionHeader = module.GetSection(i);
++			if(sectionHeader->nType != IOPMOD_SECTION_ID) continue;
++			auto iopMod = reinterpret_cast<const IOPMOD*>(module.GetSectionData(i));
++			std::string name = iopMod->moduleName;
++			const char* hlePath = (name == "padman") ? "rom0:XPADMAN" : (name == "sio2man") ? "rom0:XSIO2MAN" : nullptr;
++			if(!hlePath) break;
++			auto hleModuleIterator = m_hleModules.find(hlePath);
++			if(hleModuleIterator != std::end(m_hleModules))
++			{
++				return LoadHleModule(hleModuleIterator->second);
++			}
++			break;
++		}
++	}
++#endif
+ 	return LoadModule(module, "", loadAddress, ownsMemory);
+ }
+ 
+diff --git a/Source/iop/Iop_PadMan.cpp b/Source/iop/Iop_PadMan.cpp
+index 1431e95..2d55cdf 100644
+--- a/Source/iop/Iop_PadMan.cpp
++++ b/Source/iop/Iop_PadMan.cpp
+@@ -54,9 +54,42 @@ bool CPadMan::Invoke(uint32 method, uint32* args, uint32 argsSize, uint32* ret,
+ 		Open(args, argsSize, ret, retSize, ram);
+ 		break;
+ 	case 0x80000105:
++	case 0x00000006:
+ 		SetMainMode(args, argsSize, ret, retSize, ram);
+ 		break;
++	//Game Duo: the rest of the libpad protocol used by ps2sdk homebrew (old and new command ids).
++	case 0x80000104:
++		InfoMode(args, argsSize, ret, retSize, ram);
++		break;
++	case 0x80000102:
++		InfoAct(args, argsSize, ret, retSize, ram);
++		break;
++	case 0x80000106:
++	case 0x00000007:
++		SetActDirect(args, argsSize, ret, retSize, ram);
++		break;
++	case 0x80000107:
++		SetActuatorAlign(args, argsSize, ret, retSize, ram);
++		break;
++	case 0x80000108:
++	case 0x00000009:
++		//Button mask: digital buttons only (no pressure sensitivity is emulated).
++		ret[3] = 0x0000FFFF;
++		break;
++	case 0x80000109:
++	case 0x0000000A:
++		ret[4] = 1;
++		break;
++	case 0x8000010B:
++	case 0x0000000C:
++		ret[3] = MAX_PADS;
++		break;
++	case 0x8000010C:
++	case 0x0000000D:
++		ret[3] = 1;
++		break;
+ 	case 0x8000010D:
++	case 0x0000000E:
+ 		Close(args, argsSize, ret, retSize, ram);
+ 		break;
+ 	case 0x00000008:
+@@ -154,6 +187,7 @@ void CPadMan::SetMainMode(uint32* args, uint32 argsSize, uint32* ret, uint32 ret
+ 
+ 	if(port < MAX_PADS)
+ 	{
++		m_dualShockMode[port] = (mode != 0);
+ 		uint32 padDataAddress = m_padDataAddress[port];
+ 		if(padDataAddress != 0)
+ 		{
+@@ -163,6 +197,70 @@ void CPadMan::SetMainMode(uint32* args, uint32 argsSize, uint32* ret, uint32 ret
+ 	}
+ 
+ 	ret[3] = 1;
++	ret[5] = 1;
++}
++
++//infoMode: 1 = current mode id, 2 = current extended id, 3 = current offset, 4 = mode table.
++void CPadMan::InfoMode(uint32* args, uint32 argsSize, uint32* ret, uint32 retSize, uint8* ram)
++{
++	uint32 port = args[1];
++	uint32 infoMode = args[3];
++	int32 index = static_cast<int32>(args[4]);
++	bool dualShock = (port < MAX_PADS) ? m_dualShockMode[port] : true;
++	static const uint32 modeTable[2] = {PAD_MODE_DIGITAL, PAD_MODE_DUALSHOCK};
++	uint32 result = 0;
++	switch(infoMode)
++	{
++	case 1:
++		result = dualShock ? PAD_MODE_DUALSHOCK : PAD_MODE_DIGITAL;
++		break;
++	case 2:
++		result = dualShock ? PAD_MODE_DUALSHOCK : PAD_MODE_DIGITAL;
++		break;
++	case 3:
++		result = dualShock ? 1 : 0;
++		break;
++	case 4:
++		if(index == -1)
++			result = 2;
++		else if(index >= 0 && index < 2)
++			result = modeTable[index];
++		break;
++	}
++	ret[5] = result;
++}
++
++//Two actuators like a DualShock 2: 0 = small (on/off), 1 = large (0-255).
++void CPadMan::InfoAct(uint32* args, uint32 argsSize, uint32* ret, uint32 retSize, uint8* ram)
++{
++	int32 actuator = static_cast<int32>(args[3]);
++	uint32 command = args[4];
++	static const uint8 actData[2][4] = {{0x00, 0x00, 0x01, 0x01}, {0x00, 0x01, 0x01, 0x01}};
++	if(actuator == -1)
++		ret[5] = 2;
++	else if(actuator >= 0 && actuator < 2 && command < 4)
++		ret[5] = actData[actuator][command];
++	else
++		ret[5] = 0;
++}
++
++void CPadMan::SetActDirect(uint32* args, uint32 argsSize, uint32* ret, uint32 retSize, uint8* ram)
++{
++	uint32 port = args[1];
++	auto act = reinterpret_cast<const uint8*>(args + 3);
++	if(port < MAX_PADS)
++	{
++		m_smallMotor[port] = act[0] ? 0xFF : 0;
++		m_largeMotor[port] = act[1];
++	}
++	ret[5] = 1;
++}
++
++void CPadMan::GetVibration(unsigned int padId, uint8& largeMotor, uint8& smallMotor)
++{
++	if(padId >= MAX_PADS) return;
++	largeMotor = m_largeMotor[padId];
++	smallMotor = m_smallMotor[padId];
+ }
+ 
+ void CPadMan::Close(uint32* args, uint32 argsSize, uint32* ret, uint32 retSize, uint8* ram)
+@@ -263,6 +361,14 @@ void CPadMan::PDF_InitializeStruct0(CPadDataInterface* pPadData)
+ 	{
+ 		pPadData->SetData(4 + i, 0x7F);
+ 	}
++
++	//libpad reads whichever buffer has the newer frame, so both carry the EX mode info.
++	pPadData->SetModeCurId(PAD_MODE_DUALSHOCK << 4);
++	pPadData->SetModeTable(0, PAD_MODE_DIGITAL);
++	pPadData->SetModeTable(1, PAD_MODE_DUALSHOCK);
++	pPadData->SetNumberOfModes(2);
++	pPadData->SetModeCurOffset(1);
++	pPadData->SetModeConfig(2);
+ }
+ 
+ void CPadMan::PDF_InitializeStruct1(CPadDataInterface* padData)
+@@ -283,11 +389,14 @@ void CPadMan::PDF_InitializeStruct1(CPadDataInterface* padData)
+ 	padData->SetData(0, 0);
+ 	padData->SetData(1, PAD_MODE_DUALSHOCK << 4);
+ 
+-	//EX struct initialization
++	//EX struct initialization, as a real DualShock 2 reports it: digital and DualShock modes,
++	//DualShock current. ps2sdk's libpad only answers mode queries when modeConfig != 0.
+ 	padData->SetModeCurId(PAD_MODE_DUALSHOCK << 4);
+-	padData->SetModeCurOffset(0);
+-	padData->SetModeTable(0, PAD_MODE_DUALSHOCK);
+-	padData->SetNumberOfModes(4);
++	padData->SetModeTable(0, PAD_MODE_DIGITAL);
++	padData->SetModeTable(1, PAD_MODE_DUALSHOCK);
++	padData->SetNumberOfModes(2);
++	padData->SetModeCurOffset(1);
++	padData->SetModeConfig(2);
+ }
+ 
+ void CPadMan::PDF_SetMode(CPadDataInterface* padData, uint8 mode)
+@@ -295,6 +404,8 @@ void CPadMan::PDF_SetMode(CPadDataInterface* padData, uint8 mode)
+ 	assert(mode < 0x0F);
+ 	padData->SetData(0, 0);
+ 	padData->SetData(1, mode << 4);
++	padData->SetModeCurId(mode << 4);
++	padData->SetModeCurOffset(mode == PAD_MODE_DUALSHOCK ? 1 : 0);
+ }
+ 
+ void CPadMan::PDF_SetButtonState(CPadDataInterface* pPadData, CControllerInfo::BUTTON nButton, bool nPressed)
+diff --git a/Source/iop/Iop_PadMan.h b/Source/iop/Iop_PadMan.h
+index 4fb63f8..2a0e5af 100644
+--- a/Source/iop/Iop_PadMan.h
++++ b/Source/iop/Iop_PadMan.h
+@@ -28,7 +28,7 @@ namespace Iop
+ 		void LoadState(Framework::CZipArchiveReader&) override;
+ 		void SetButtonState(unsigned int, PS2::CControllerInfo::BUTTON, bool, uint8*) override;
+ 		void SetAxisState(unsigned int, PS2::CControllerInfo::BUTTON, uint8, uint8*) override;
+-		void GetVibration(unsigned int padId, uint8& largeMotor, uint8& smallMotor) override{};
++		void GetVibration(unsigned int padId, uint8& largeMotor, uint8& smallMotor) override;
+ 
+ 		enum MODULE_ID
+ 		{
+@@ -44,6 +44,10 @@ namespace Iop
+ 			MAX_PADS = 2,
+ 		};
+ 
++		uint8 m_largeMotor[MAX_PADS] = {};
++		uint8 m_smallMotor[MAX_PADS] = {};
++		bool m_dualShockMode[MAX_PADS] = {true, true};
++
+ 		struct PADDATA
+ 		{
+ 			uint32 nFrame;
+@@ -112,6 +116,7 @@ namespace Iop
+ 			virtual void SetModeCurOffset(unsigned int) = 0;
+ 			virtual void SetModeTable(unsigned int, unsigned int) = 0;
+ 			virtual void SetNumberOfModes(unsigned int) = 0;
++			virtual void SetModeConfig(unsigned int) {}
+ 		};
+ 
+ 		template <typename T>
+@@ -178,6 +183,11 @@ namespace Iop
+ 				m_pPadData->nNrOfModes = number;
+ 			}
+ 
++			void SetModeConfig(unsigned int value) override
++			{
++				m_pPadData->nModeOk = value;
++			}
++
+ 		private:
+ 			T* m_pPadData;
+ 		};
+@@ -196,6 +206,9 @@ namespace Iop
+ 
+ 		void Open(uint32*, uint32, uint32*, uint32, uint8*);
+ 		void SetMainMode(uint32*, uint32, uint32*, uint32, uint8*);
++		void InfoMode(uint32*, uint32, uint32*, uint32, uint8*);
++		void InfoAct(uint32*, uint32, uint32*, uint32, uint8*);
++		void SetActDirect(uint32*, uint32, uint32*, uint32, uint8*);
+ 		void Close(uint32*, uint32, uint32*, uint32, uint8*);
+ 		void SetActuatorAlign(uint32*, uint32, uint32*, uint32, uint8*);
+ 		void Init(uint32*, uint32, uint32*, uint32, uint8*);
+@@ -230,6 +243,11 @@ namespace Iop
+ 	{
+ 	}
+ 
++	template <>
++	inline void CPadMan::CPadDataHandler<CPadMan::PADDATA>::SetModeConfig(unsigned int)
++	{
++	}
++
+ 	template <>
+ 	inline void CPadMan::CPadDataHandler<CPadMan::PADDATA80>::SetModeCurId(unsigned int)
+ 	{
+@@ -246,4 +264,9 @@ namespace Iop
+ 	inline void CPadMan::CPadDataHandler<CPadMan::PADDATA80>::SetNumberOfModes(unsigned int)
+ 	{
+ 	}
++
++	template <>
++	inline void CPadMan::CPadDataHandler<CPadMan::PADDATA80>::SetModeConfig(unsigned int)
++	{
++	}
+ }
+diff --git a/Source/ui_js/CMakeLists.txt b/Source/ui_js/CMakeLists.txt
+index cf3518e..49485ca 100644
+--- a/Source/ui_js/CMakeLists.txt
++++ b/Source/ui_js/CMakeLists.txt
+@@ -43,8 +43,10 @@ list(APPEND UI_JS_PROJECT_LIBS sh_openal)
+ add_executable(Play
+ 	GSH_OpenGLJs.cpp
+ 	GSH_OpenGLJs.h
+-	InputProviderEmscripten.cpp
+-	InputProviderEmscripten.h
++	InputProviderDuo.cpp
++	InputProviderDuo.h
++	SH_Duo.cpp
++	SH_Duo.h
+ 	Main.cpp
+ 	Ps2VmJs.cpp
+ 	Ps2VmJs.h
+@@ -54,16 +56,15 @@ target_link_libraries(Play PUBLIC ${UI_JS_PROJECT_LIBS})
+ target_link_options(Play PRIVATE "--bind")
+ target_link_options(Play PRIVATE "-sMODULARIZE=1")
+ target_link_options(Play PRIVATE "-sEXPORT_ES6=1")
+-target_link_options(Play PRIVATE "-sUSE_ES6_IMPORT_META=0")
+-target_link_options(Play PRIVATE "-sEXPORTED_FUNCTIONS=['_main', '_initVm', '_EmptyBlockHandler', '_MemoryUtils_GetByteProxy', '_MemoryUtils_GetHalfProxy', '_MemoryUtils_GetWordProxy', '_MemoryUtils_GetDoubleProxy', '_MemoryUtils_SetByteProxy', '_MemoryUtils_SetHalfProxy', '_MemoryUtils_SetWordProxy', '_MemoryUtils_SetDoubleProxy', '_LWL_Proxy', '_LWR_Proxy', '_LDL_Proxy', '_LDR_Proxy', '_SWL_Proxy', '_SWR_Proxy', '_SDL_Proxy', '_SDR_Proxy']")
++target_link_options(Play PRIVATE "-sEXPORTED_FUNCTIONS=['_main', '_EmptyBlockHandler', '_MemoryUtils_GetByteProxy', '_MemoryUtils_GetHalfProxy', '_MemoryUtils_GetWordProxy', '_MemoryUtils_GetDoubleProxy', '_MemoryUtils_SetByteProxy', '_MemoryUtils_SetHalfProxy', '_MemoryUtils_SetWordProxy', '_MemoryUtils_SetDoubleProxy', '_LWL_Proxy', '_LWR_Proxy', '_LDL_Proxy', '_LDR_Proxy', '_SWL_Proxy', '_SWR_Proxy', '_SDL_Proxy', '_SDR_Proxy']")
+ target_link_options(Play PRIVATE "-sEXPORTED_RUNTIME_METHODS=['ccall', 'FS']")
+ target_link_options(Play PRIVATE "-sFORCE_FILESYSTEM")
+ target_link_options(Play PRIVATE "-sALLOW_TABLE_GROWTH")
+ target_link_options(Play PRIVATE "-sALLOW_MEMORY_GROWTH")
+ #target_link_options(Play PRIVATE "-sASSERTIONS=2")
+ target_link_options(Play PRIVATE "-sEXPORT_NAME=Play")
+-target_link_options(Play PRIVATE "-sPTHREAD_POOL_SIZE=2")
+-target_link_options(Play PRIVATE "-sWASM_BIGINT")
++target_link_options(Play PRIVATE "-sPTHREAD_POOL_SIZE=6")
++target_link_options(Play PRIVATE "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/duo_pre.js")
+ target_link_options(Play PRIVATE "-sOFFSCREEN_FRAMEBUFFER=1")
+ target_link_options(Play PRIVATE "-sENVIRONMENT=web,worker")
+ target_link_options(Play PRIVATE "-sUSE_WEBGL2=1")
+diff --git a/Source/ui_js/GSH_OpenGLJs.cpp b/Source/ui_js/GSH_OpenGLJs.cpp
+index 5c98e96..c58a679 100644
+--- a/Source/ui_js/GSH_OpenGLJs.cpp
++++ b/Source/ui_js/GSH_OpenGLJs.cpp
+@@ -23,4 +23,5 @@ void CGSH_OpenGLJs::ReleaseImpl()
+ 
+ void CGSH_OpenGLJs::PresentBackbuffer()
+ {
++	emscripten_webgl_commit_frame();
+ }
+diff --git a/Source/ui_js/InputProviderDuo.cpp b/Source/ui_js/InputProviderDuo.cpp
+new file mode 100644
+index 0000000..8834b1d
+--- /dev/null
++++ b/Source/ui_js/InputProviderDuo.cpp
+@@ -0,0 +1,54 @@
++#include "InputProviderDuo.h"
++#include <emscripten.h>
++
++constexpr uint32 PROVIDER_ID = 'Duo!';
++
++uint32 CInputProviderDuo::GetId() const
++{
++	return PROVIDER_ID;
++}
++
++std::string CInputProviderDuo::GetTargetDescription(const BINDINGTARGET&) const
++{
++	return std::string();
++}
++
++BINDINGTARGET CInputProviderDuo::MakeButtonTarget(PS2::CControllerInfo::BUTTON button)
++{
++	auto type = PS2::CControllerInfo::IsAxis(button) ? BINDINGTARGET::KEYTYPE::AXIS : BINDINGTARGET::KEYTYPE::BUTTON;
++	return BINDINGTARGET(PROVIDER_ID, DeviceIdType{{0}}, button, type);
++}
++
++BINDINGTARGET CInputProviderDuo::MakeMotorTarget()
++{
++	return BINDINGTARGET(PROVIDER_ID, DeviceIdType{{0}}, 0, BINDINGTARGET::KEYTYPE::MOTOR);
++}
++
++void CInputProviderDuo::SetPadState(uint32 buttons, uint8 lx, uint8 ly, uint8 rx, uint8 ry)
++{
++	using namespace PS2;
++	const uint8 axes[4] = {lx, ly, rx, ry};
++	for(uint32 i = 0; i < 4; i++)
++	{
++		if(axes[i] == m_axes[i]) continue;
++		m_axes[i] = axes[i];
++		OnInput(MakeButtonTarget(static_cast<CControllerInfo::BUTTON>(CControllerInfo::ANALOG_LEFT_X + i)), axes[i]);
++	}
++	uint32 changed = buttons ^ m_buttons;
++	m_buttons = buttons;
++	for(uint32 i = CControllerInfo::DPAD_UP; i < CControllerInfo::MAX_BUTTONS; i++)
++	{
++		if(!(changed & (1 << i))) continue;
++		OnInput(MakeButtonTarget(static_cast<CControllerInfo::BUTTON>(i)), (buttons >> i) & 1);
++	}
++}
++
++void CInputProviderDuo::SetVibration(DeviceIdType, uint8 largeMotor, uint8 smallMotor)
++{
++	if(largeMotor == m_largeMotor && smallMotor == m_smallMotor) return;
++	m_largeMotor = largeMotor;
++	m_smallMotor = smallMotor;
++	MAIN_THREAD_ASYNC_EM_ASM({
++		if(Module.duoOnVibration) Module.duoOnVibration($0, $1);
++	}, largeMotor, smallMotor);
++}
+diff --git a/Source/ui_js/InputProviderDuo.h b/Source/ui_js/InputProviderDuo.h
+new file mode 100644
+index 0000000..04493df
+--- /dev/null
++++ b/Source/ui_js/InputProviderDuo.h
+@@ -0,0 +1,27 @@
++#pragma once
++
++#include "input/InputProvider.h"
++#include "ControllerInfo.h"
++
++// Game Duo: the host app sends the whole pad state at once (buttons + analog axes) and receives
++// the DualShock motors back, instead of going through keyboard events.
++class CInputProviderDuo : public CInputProvider
++{
++public:
++	uint32 GetId() const override;
++	std::string GetTargetDescription(const BINDINGTARGET&) const override;
++	void SetVibration(DeviceIdType, uint8 largeMotor, uint8 smallMotor) override;
++
++	static BINDINGTARGET MakeButtonTarget(PS2::CControllerInfo::BUTTON);
++	static BINDINGTARGET MakeMotorTarget();
++
++	// buttons: bit n = PS2::CControllerInfo::BUTTON n (non-axis buttons only).
++	// axes: 0x00..0xFF, 0x7F neutral, in ANALOG_LEFT_X, LEFT_Y, RIGHT_X, RIGHT_Y order.
++	void SetPadState(uint32 buttons, uint8 lx, uint8 ly, uint8 rx, uint8 ry);
++
++private:
++	uint32 m_buttons = 0;
++	uint8 m_axes[4] = {0x7F, 0x7F, 0x7F, 0x7F};
++	uint8 m_largeMotor = 0;
++	uint8 m_smallMotor = 0;
++};
+diff --git a/Source/ui_js/Main.cpp b/Source/ui_js/Main.cpp
+index 999e24c..3b2e1ab 100644
+--- a/Source/ui_js/Main.cpp
++++ b/Source/ui_js/Main.cpp
+@@ -1,18 +1,22 @@
++// Game Duo entry points for the Play! web build. The host page (DuoDS/Resources/PS2Web) calls
++// these through embind; the pad, disc and memory card all come from the iOS app.
+ #include <cstdio>
+ #include <emscripten/bind.h>
++#include <emscripten/html5.h>
+ #include "Ps2VmJs.h"
+ #include "GSH_OpenGLJs.h"
+-#include "sound/SH_OpenAL/SH_OpenALProxy.h"
++#include "SH_Duo.h"
+ #include "input/PH_GenericInput.h"
+-#include "InputProviderEmscripten.h"
++#include "InputProviderDuo.h"
+ #include "ui_shared/StatsManager.h"
++#include "AppConfig.h"
++#include "PS2VM_Preferences.h"
+ #include "DefaultAppConfig.h"
+ 
+ CPs2VmJs* g_virtualMachine = nullptr;
+ CGSHandler::NewFrameEvent::Connection g_gsNewFrameConnection;
+ EMSCRIPTEN_WEBGL_CONTEXT_HANDLE g_context = 0;
+-std::shared_ptr<CInputProviderEmscripten> g_inputProvider;
+-CSH_OpenAL* g_soundHandler = nullptr;
++std::shared_ptr<CInputProviderDuo> g_inputProvider;
+ 
+ int main(int argc, const char** argv)
+ {
+@@ -20,131 +24,141 @@ int main(int argc, const char** argv)
+ 	return 0;
+ }
+ 
+-EM_BOOL keyboardCallback(int eventType, const EmscriptenKeyboardEvent* keyEvent, void* userData)
++static void setPresentation(int width, int height)
+ {
+-	if(keyEvent->repeat)
+-	{
+-		return true;
+-	}
+-	switch(eventType)
+-	{
+-	case EMSCRIPTEN_EVENT_KEYDOWN:
+-		g_inputProvider->OnKeyDown(keyEvent->code);
+-		break;
+-	case EMSCRIPTEN_EVENT_KEYUP:
+-		g_inputProvider->OnKeyUp(keyEvent->code);
+-		break;
+-	}
+-	return true;
++	// Resizes the canvas and emscripten's offscreen framebuffer together.
++	emscripten_set_canvas_element_size("#outputCanvas", width, height);
++	if(!g_virtualMachine) return;
++	CGSHandler::PRESENTATION_PARAMS presentationParams;
++	presentationParams.mode = CGSHandler::PRESENTATION_MODE_FIT;
++	presentationParams.windowWidth = width;
++	presentationParams.windowHeight = height;
++	g_virtualMachine->m_ee->m_gs->SetPresentationParams(presentationParams);
+ }
+ 
+-extern "C" void initVm()
++// mcPath / hostPath are MEMFS directories the page fills before booting.
++void duoInit(int width, int height, std::string mcPath, std::string hostPath)
+ {
+ 	EmscriptenWebGLContextAttributes attr;
+ 	emscripten_webgl_init_context_attributes(&attr);
+ 	attr.majorVersion = 2;
+ 	attr.minorVersion = 0;
+ 	attr.alpha = false;
++	attr.antialias = false;
++	attr.powerPreference = EM_WEBGL_POWER_PREFERENCE_HIGH_PERFORMANCE;
++	// Frames reach the canvas only on emscripten_webgl_commit_frame() (GSH_OpenGLJs::PresentBackbuffer),
++	// never half-drawn while the GS thread's proxied GL calls are still arriving.
++	attr.explicitSwapControl = true;
++	emscripten_set_canvas_element_size("#outputCanvas", width, height);
+ 	g_context = emscripten_webgl_create_context("#outputCanvas", &attr);
+ 	assert(g_context >= 0);
+ 
+ 	g_virtualMachine = new CPs2VmJs();
+ 	g_virtualMachine->Initialize();
++	// After Initialize(): the VM registers these preferences with their defaults.
++	auto& config = CAppConfig::GetInstance();
++	config.SetPreferencePath(PREF_PS2_MC0_DIRECTORY, mcPath);
++	config.SetPreferencePath(PREF_PS2_HOST_DIRECTORY, hostPath);
++	// Small SPU blocks (22 x 45 frames ~ 22 ms) keep the audio ring evenly fed.
++	config.SetPreferenceInteger(PREF_AUDIO_SPUBLOCKCOUNT, 22);
++	g_virtualMachine->ReloadSpuBlockCount();
+ 	g_virtualMachine->CreateGSHandler(CGSH_OpenGLJs::GetFactoryFunction(g_context));
++	setPresentation(width, height);
+ 
+ 	{
+-		//Size here needs to match the size of the canvas in HTML file.
+-
+-		CGSHandler::PRESENTATION_PARAMS presentationParams;
+-		presentationParams.mode = CGSHandler::PRESENTATION_MODE_FIT;
+-		presentationParams.windowWidth = 640;
+-		presentationParams.windowHeight = 480;
+-
+-		g_virtualMachine->m_ee->m_gs->SetPresentationParams(presentationParams);
+-	}
+-
+-	{
++		using namespace PS2;
+ 		g_virtualMachine->CreatePadHandler(CPH_GenericInput::GetFactoryFunction());
+ 		auto padHandler = static_cast<CPH_GenericInput*>(g_virtualMachine->GetPadHandler());
+ 		auto& bindingManager = padHandler->GetBindingManager();
+-
+-		g_inputProvider = std::make_shared<CInputProviderEmscripten>();
++		g_inputProvider = std::make_shared<CInputProviderDuo>();
+ 		bindingManager.RegisterInputProvider(g_inputProvider);
+-
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::START, CInputProviderEmscripten::MakeBindingTarget("Enter"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::SELECT, CInputProviderEmscripten::MakeBindingTarget("Backspace"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::DPAD_LEFT, CInputProviderEmscripten::MakeBindingTarget("ArrowLeft"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::DPAD_RIGHT, CInputProviderEmscripten::MakeBindingTarget("ArrowRight"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::DPAD_UP, CInputProviderEmscripten::MakeBindingTarget("ArrowUp"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::DPAD_DOWN, CInputProviderEmscripten::MakeBindingTarget("ArrowDown"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::SQUARE, CInputProviderEmscripten::MakeBindingTarget("KeyA"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::CROSS, CInputProviderEmscripten::MakeBindingTarget("KeyZ"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::TRIANGLE, CInputProviderEmscripten::MakeBindingTarget("KeyS"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::CIRCLE, CInputProviderEmscripten::MakeBindingTarget("KeyX"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::L1, CInputProviderEmscripten::MakeBindingTarget("Key1"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::L2, CInputProviderEmscripten::MakeBindingTarget("Key2"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::L3, CInputProviderEmscripten::MakeBindingTarget("Key3"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::R1, CInputProviderEmscripten::MakeBindingTarget("Key8"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::R2, CInputProviderEmscripten::MakeBindingTarget("Key9"));
+-		bindingManager.SetSimpleBinding(0, PS2::CControllerInfo::R3, CInputProviderEmscripten::MakeBindingTarget("Key0"));
+-
+-		bindingManager.SetSimulatedAxisBinding(0, PS2::CControllerInfo::ANALOG_LEFT_X,
+-		                                       CInputProviderEmscripten::MakeBindingTarget("KeyF"),
+-		                                       CInputProviderEmscripten::MakeBindingTarget("KeyH"));
+-		bindingManager.SetSimulatedAxisBinding(0, PS2::CControllerInfo::ANALOG_LEFT_Y,
+-		                                       CInputProviderEmscripten::MakeBindingTarget("KeyT"),
+-		                                       CInputProviderEmscripten::MakeBindingTarget("KeyG"));
+-
+-		bindingManager.SetSimulatedAxisBinding(0, PS2::CControllerInfo::ANALOG_RIGHT_X,
+-		                                       CInputProviderEmscripten::MakeBindingTarget("KeyJ"),
+-		                                       CInputProviderEmscripten::MakeBindingTarget("KeyL"));
+-		bindingManager.SetSimulatedAxisBinding(0, PS2::CControllerInfo::ANALOG_RIGHT_Y,
+-		                                       CInputProviderEmscripten::MakeBindingTarget("KeyI"),
+-		                                       CInputProviderEmscripten::MakeBindingTarget("KeyK"));
++		for(uint32 i = 0; i < CControllerInfo::MAX_BUTTONS; i++)
++		{
++			auto button = static_cast<CControllerInfo::BUTTON>(i);
++			bindingManager.SetSimpleBinding(0, button, CInputProviderDuo::MakeButtonTarget(button));
++		}
++		bindingManager.SetMotorBinding(0, CInputProviderDuo::MakeMotorTarget());
++		g_inputProvider->SetPadState(0, 0x7F, 0x7F, 0x7F, 0x7F);
+ 	}
+ 
+-	{
+-		g_soundHandler = new CSH_OpenAL();
+-		g_virtualMachine->CreateSoundHandler(CSH_OpenALProxy::GetFactoryFunction(g_soundHandler));
+-	}
++	g_virtualMachine->CreateSoundHandler(CSH_Duo::GetFactoryFunction());
+ 
+ 	g_gsNewFrameConnection = g_virtualMachine->GetGSHandler()->OnNewFrame.Connect(std::bind(&CStatsManager::OnGsNewFrame, &CStatsManager::GetInstance(), std::placeholders::_1));
++}
+ 
+-	EMSCRIPTEN_RESULT result = EMSCRIPTEN_RESULT_SUCCESS;
++void duoBootElf(std::string path)
++{
++	g_virtualMachine->BootElf(path);
++}
+ 
+-	result = emscripten_set_keydown_callback("#outputCanvas", nullptr, false, &keyboardCallback);
+-	assert(result == EMSCRIPTEN_RESULT_SUCCESS);
++void duoBootDisc(std::string path)
++{
++	g_virtualMachine->BootDiscImage(path);
++}
+ 
+-	result = emscripten_set_keyup_callback("#outputCanvas", nullptr, false, &keyboardCallback);
+-	assert(result == EMSCRIPTEN_RESULT_SUCCESS);
++void duoSetPad(uint32 buttons, int lx, int ly, int rx, int ry)
++{
++	if(g_inputProvider) g_inputProvider->SetPadState(buttons, lx, ly, rx, ry);
+ }
+ 
+-void bootElf(std::string path)
++// Asynchronous: the main thread must never block on the VM thread (the GS thread proxies its
++// WebGL calls to the main thread).
++void duoPause()
+ {
+-	g_virtualMachine->BootElf(path);
++	if(g_virtualMachine) g_virtualMachine->PauseAsync();
+ }
+ 
+-void bootDiscImage(std::string path)
++void duoResume()
+ {
+-	g_virtualMachine->BootDiscImage(path);
++	if(g_virtualMachine) g_virtualMachine->ResumeAsync();
+ }
+ 
+-int getFrames()
++void duoSetPresentation(int width, int height)
++{
++	setPresentation(width, height);
++}
++
++// Address of the audio ring (CSH_Duo::RING) in wasm memory, for the AudioWorklet.
++uint32 duoAudioRing()
++{
++	return reinterpret_cast<uintptr_t>(CSH_Duo::GetRing());
++}
++
++uint32 duoAudioRingSamplesOffset()
++{
++	return offsetof(CSH_Duo::RING, samples);
++}
++
++int duoGetFrames()
+ {
+ 	return CStatsManager::GetInstance().GetFrames();
+ }
+ 
+-void clearStats()
++void duoClearStats()
+ {
+ 	CStatsManager::GetInstance().ClearStats();
+ }
+ 
++void duoSetFrameLimit(bool enabled)
++{
++	CAppConfig::GetInstance().SetPreferenceBoolean(PREF_PS2_LIMIT_FRAMERATE, enabled);
++	if(g_virtualMachine) g_virtualMachine->ReloadFrameRateLimitAsync();
++}
++
+ EMSCRIPTEN_BINDINGS(Play)
+ {
+ 	using namespace emscripten;
+ 
+-	function("bootElf", &bootElf);
+-	function("bootDiscImage", &bootDiscImage);
+-	function("getFrames", &getFrames);
+-	function("clearStats", &clearStats);
++	function("duoInit", &duoInit);
++	function("duoBootElf", &duoBootElf);
++	function("duoBootDisc", &duoBootDisc);
++	function("duoSetPad", &duoSetPad);
++	function("duoPause", &duoPause);
++	function("duoResume", &duoResume);
++	function("duoSetPresentation", &duoSetPresentation);
++	function("duoGetFrames", &duoGetFrames);
++	function("duoAudioRing", &duoAudioRing);
++	function("duoAudioRingSamplesOffset", &duoAudioRingSamplesOffset);
++	function("duoClearStats", &duoClearStats);
++	function("duoSetFrameLimit", &duoSetFrameLimit);
+ }
+diff --git a/Source/ui_js/Ps2VmJs.cpp b/Source/ui_js/Ps2VmJs.cpp
+index b779dbe..7874d72 100644
+--- a/Source/ui_js/Ps2VmJs.cpp
++++ b/Source/ui_js/Ps2VmJs.cpp
+@@ -81,4 +81,17 @@ void CPs2VmJs::BootDiscImage(std::string path)
+ 		printf("Starting...\r\n");
+ 		ResumeImpl();
+ 	});
+-}
+\ No newline at end of file
++}
++void CPs2VmJs::ResumeAsync()
++{
++	m_mailBox.SendCall([this]() {
++		if(GetStatus() == RUNNING) return;
++		ResumeImpl();
++		OnRunningStateChange();
++	});
++}
++
++void CPs2VmJs::ReloadFrameRateLimitAsync()
++{
++	m_mailBox.SendCall([this]() { ReloadFrameRateLimit(); });
++}
+diff --git a/Source/ui_js/Ps2VmJs.h b/Source/ui_js/Ps2VmJs.h
+index 4484d5d..a229e4d 100644
+--- a/Source/ui_js/Ps2VmJs.h
++++ b/Source/ui_js/Ps2VmJs.h
+@@ -9,4 +9,6 @@ public:
+ 
+ 	void BootElf(std::string);
+ 	void BootDiscImage(std::string);
++	void ResumeAsync();
++	void ReloadFrameRateLimitAsync();
+ };
+diff --git a/Source/ui_js/SH_Duo.cpp b/Source/ui_js/SH_Duo.cpp
+new file mode 100644
+index 0000000..52f66b8
+--- /dev/null
++++ b/Source/ui_js/SH_Duo.cpp
+@@ -0,0 +1,45 @@
++#include "SH_Duo.h"
++#include <algorithm>
++
++static CSH_Duo::RING g_ring = {{0}, {0}, CSH_Duo::RING_FRAMES, 44100, {}};
++
++CSoundHandler::FactoryFunction CSH_Duo::GetFactoryFunction()
++{
++	return []() { return new CSH_Duo(); };
++}
++
++CSH_Duo::RING* CSH_Duo::GetRing()
++{
++	return &g_ring;
++}
++
++void CSH_Duo::Reset()
++{
++	g_ring.writeFrames.store(g_ring.readFrames.load());
++}
++
++void CSH_Duo::Write(int16* samples, unsigned int sampleCount, unsigned int sampleRate)
++{
++	g_ring.sampleRate = sampleRate;
++	uint32 frames = sampleCount / 2;
++	uint32 write = g_ring.writeFrames.load(std::memory_order_relaxed);
++	uint32 read = g_ring.readFrames.load(std::memory_order_acquire);
++	uint32 free = RING_FRAMES - (write - read);
++	// When the reader has stalled (page hidden, audio suspended) drop this block instead of
++	// overwriting what it has not read yet.
++	if(frames > free) return;
++	uint32 pos = write % RING_FRAMES;
++	uint32 first = std::min(frames, RING_FRAMES - pos);
++	std::copy(samples, samples + first * 2, g_ring.samples + pos * 2);
++	std::copy(samples + first * 2, samples + frames * 2, g_ring.samples);
++	g_ring.writeFrames.store(write + frames, std::memory_order_release);
++}
++
++bool CSH_Duo::HasFreeBuffers()
++{
++	return true;
++}
++
++void CSH_Duo::RecycleBuffers()
++{
++}
+diff --git a/Source/ui_js/SH_Duo.h b/Source/ui_js/SH_Duo.h
+new file mode 100644
+index 0000000..b9f73b4
+--- /dev/null
++++ b/Source/ui_js/SH_Duo.h
+@@ -0,0 +1,33 @@
++#pragma once
++
++#include "sound/SoundHandler.h"
++#include <atomic>
++
++// Game Duo sound output: the SPU mix goes into a lock-free ring buffer in wasm memory that an
++// AudioWorklet (duo_audio.js in the app) reads on the audio thread, so audio never waits for the
++// browser main thread (which is busy proxying WebGL calls).
++class CSH_Duo : public CSoundHandler
++{
++public:
++	enum
++	{
++		RING_FRAMES = 32768, // stereo frames, ~0.74 s at 44.1 kHz
++	};
++
++	struct RING
++	{
++		std::atomic<uint32> writeFrames; // total frames written (wraps)
++		std::atomic<uint32> readFrames;  // total frames read by the worklet (wraps)
++		uint32 capacity;
++		uint32 sampleRate;
++		int16 samples[RING_FRAMES * 2];
++	};
++
++	static FactoryFunction GetFactoryFunction();
++	static RING* GetRing();
++
++	void Reset() override;
++	void Write(int16*, unsigned int, unsigned int) override;
++	bool HasFreeBuffers() override;
++	void RecycleBuffers() override;
++};
+diff --git a/Source/ui_js/duo_pre.js b/Source/ui_js/duo_pre.js
+new file mode 100644
+index 0000000..ca86ac0
+--- /dev/null
++++ b/Source/ui_js/duo_pre.js
+@@ -0,0 +1,86 @@
++// Game Duo: runs in the page and in every pthread worker.
++// WKWebView exposes shared memory but not the SharedArrayBuffer global; restore it.
++if (typeof SharedArrayBuffer === 'undefined') {
++  globalThis.SharedArrayBuffer = new WebAssembly.Memory({ initial: 0, maximum: 0, shared: true }).buffer.constructor;
++}
++
++// Disc image access: synchronous range reads from the app's duops2:// handler, on whichever
++// thread asks (the VM thread in practice). 256 KiB blocks, LRU of 64 blocks, sequential read-ahead.
++(function () {
++  const BLOCK = 256 * 1024;
++  const MAX_BLOCKS = 64;
++  const sizes = new Map();
++  const cache = new Map();          // key "path#block" -> Uint8Array (insertion order = LRU)
++  const isWorker = typeof WorkerGlobalScope !== 'undefined';
++  const base = (typeof location !== 'undefined' ? location.origin : '') + '/disc';
++  const url = (path) => base + path.split('/').map(encodeURIComponent).join('/');
++
++  function request(path, start, end) {
++    const xhr = new XMLHttpRequest();
++    xhr.open('GET', url(path), false);
++    xhr.setRequestHeader('Range', `bytes=${start}-${end}`);
++    if (isWorker) {
++      xhr.responseType = 'arraybuffer';
++      xhr.send();
++      if (xhr.status !== 200 && xhr.status !== 206) return null;
++      return new Uint8Array(xhr.response);
++    }
++    xhr.overrideMimeType('text/plain; charset=x-user-defined');
++    xhr.send();
++    if (xhr.status !== 200 && xhr.status !== 206) return null;
++    const text = xhr.responseText;
++    const bytes = new Uint8Array(text.length);
++    for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i) & 0xff;
++    return bytes;
++  }
++
++  function block(path, index, size) {
++    const key = path + '#' + index;
++    let data = cache.get(key);
++    if (data) { cache.delete(key); cache.set(key, data); return data; }
++    const start = index * BLOCK;
++    // Read two blocks at once when the next one is not cached (sequential streaming).
++    const span = cache.has(path + '#' + (index + 1)) ? 1 : 2;
++    const end = Math.min(size, start + span * BLOCK) - 1;
++    const bytes = request(path, start, end);
++    if (!bytes) return null;
++    for (let i = 0; i * BLOCK < bytes.length; i++) {
++      cache.set(path + '#' + (index + i), bytes.subarray(i * BLOCK, Math.min(bytes.length, (i + 1) * BLOCK)));
++    }
++    while (cache.size > MAX_BLOCKS) cache.delete(cache.keys().next().value);
++    return cache.get(key);
++  }
++
++  Module.duoDiscSize = function (path) {
++    if (sizes.has(path)) return sizes.get(path);
++    const xhr = new XMLHttpRequest();
++    xhr.open('GET', (typeof location !== 'undefined' ? location.origin : '') + '/disc-size' + path.split('/').map(encodeURIComponent).join('/'), false);
++    xhr.send();
++    const size = xhr.status === 200 ? Number(xhr.responseText) : -1;
++    if (size >= 0) sizes.set(path, size);
++    return size;
++  };
++
++  Module.duoDiscRead = function (path, dst, position, length) {
++    const size = Module.duoDiscSize(path);
++    if (size < 0) return -1;
++    const heap = new Uint8Array(wasmMemory.buffer);
++    let done = 0;
++    while (done < length) {
++      const pos = position + done;
++      if (pos >= size) break;
++      const index = Math.floor(pos / BLOCK);
++      const data = block(path, index, size);
++      if (!data) return -1;
++      const offset = pos - index * BLOCK;
++      const count = Math.min(length - done, data.length - offset);
++      if (count <= 0) break;
++      heap.set(data.subarray(offset, offset + count), dst + done);
++      done += count;
++    }
++    return done;
++  };
++})();
++
++// The wasm memory for the audio worklet (it reads the SH_Duo ring buffer directly).
++Module.duoMemory = function () { return wasmMemory; };
