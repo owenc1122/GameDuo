@@ -1,0 +1,745 @@
+{
+ "size_mm": [
+  301,
+  78,
+  182
+ ],
+ "tray_travel_m": 0.135,
+ "layout": {
+  "body_bbox": {
+   "center_mm": [
+    0,
+    39,
+    0
+   ],
+   "size_mm": [
+    301,
+    78,
+    182
+   ],
+   "grade": "官方",
+   "note": "官方外形 301×78×182 mm（W×H×D），SCPH-30001 说明书 Specifications"
+  },
+  "upper_tier": {
+   "center_mm": [
+    0,
+    57.9,
+    0
+   ],
+   "size_mm": [
+    301,
+    40.3,
+    182
+   ],
+   "grade": "照片校准",
+   "note": "上层=6 片横向鳍片叠层（第1片即顶板），y 37.7–78；前面与右侧(x+)为鳍片，左侧(x-)与后面为平面"
+  },
+  "lower_tier": {
+   "center_mm": [
+    -14.0,
+    18.0,
+    -10.5
+   ],
+   "size_mm": [
+    273.0,
+    36.0,
+    161.0
+   ],
+   "grade": "照片校准",
+   "note": "下层箱体 x -150.5..+122.5, y 0..36, z -91..+70；前面比鳍片前沿缩进约21 mm，右侧比上层缩进约28 mm；左侧、后面与上层齐平"
+  },
+  "groove_band": {
+   "center_mm": [
+    0,
+    36.9,
+    80.5
+   ],
+   "size_mm": [
+    301,
+    1.7,
+    21.0
+   ],
+   "grade": "照片校准",
+   "note": "上下层之间的阴影缝/悬挑带：上层底面 y≈37.7 与下层顶面 y≈36.0 之间约1.7 mm缝，前方悬挑深21 mm；鳍片间另有5条槽见 fins"
+  },
+  "overhang_right": {
+   "center_mm": [
+    136.5,
+    18.0,
+    0
+   ],
+   "size_mm": [
+    28.0,
+    36.0,
+    182
+   ],
+   "grade": "照片校准",
+   "note": "右侧(x+)下方空出区域（上层悬挑，下层不占），x 122.5..150.5"
+  },
+  "tray_opening": {
+   "center_mm": [
+    60.3,
+    57.9,
+    91.0
+   ],
+   "size_mm": [
+    126.5,
+    12.1,
+    3.0
+   ],
+   "grade": "照片校准",
+   "note": "托盘前脸=第3、4片鳍片段，x -3.0..+123.5，y 51.8..63.9；分缝在 x≈-3 与 +123.5"
+  },
+  "tray": {
+   "center_mm": [
+    60.3,
+    57.9,
+    148.0
+   ],
+   "size_mm": [
+    126.5,
+    12.1,
+    156.0
+   ],
+   "grade": "估计",
+   "note": "弹出状态整体包络：前脸 z=91+135=226，托盘长约156 mm（iFixit 光驱照片推算），后端 z≈70 仍在机内"
+  },
+  "btn_reset": {
+   "center_mm": [
+    136.0,
+    69.0,
+    91.5
+   ],
+   "size_mm": [
+    11.0,
+    10.5,
+    2.0
+   ],
+   "grade": "照片校准",
+   "note": "待机/RESET 键，近方形，跨第1片下缘至第3片上缘；图标青绿色"
+  },
+  "btn_eject": {
+   "center_mm": [
+    136.2,
+    46.3,
+    91.5
+   ],
+   "size_mm": [
+    11.0,
+    10.5,
+    2.0
+   ],
+   "grade": "照片校准",
+   "note": "OPEN(⏏) 键，跨第4片下缘至第6片上缘；图标蓝色"
+  },
+  "led_power": {
+   "center_mm": [
+    140.4,
+    71.7,
+    92.0
+   ],
+   "size_mm": [
+    1.6,
+    1.6,
+    0.5
+   ],
+   "grade": "照片校准",
+   "note": "RESET 键右上角圆点；待机红、开机绿（颜色为官方说明书文字）"
+  },
+  "led_eject": {
+   "center_mm": [
+    140.2,
+    42.2,
+    92.0
+   ],
+   "size_mm": [
+    1.6,
+    1.6,
+    0.5
+   ],
+   "grade": "照片校准",
+   "note": "OPEN 键右下角圆点；蓝色（照片）"
+  },
+  "slot_mc_1": {
+   "center_mm": [
+    -100.8,
+    61.5,
+    91.0
+   ],
+   "size_mm": [
+    41.0,
+    9.5,
+    8.0
+   ],
+   "grade": "照片校准",
+   "note": "存储卡槽1（第3片区域，含上下缝），槽面印 MEMORY CARD；深度为估计"
+  },
+  "slot_mc_2": {
+   "center_mm": [
+    -50.3,
+    61.5,
+    91.0
+   ],
+   "size_mm": [
+    41.0,
+    9.5,
+    8.0
+   ],
+   "grade": "照片校准",
+   "note": "存储卡槽2，与槽1间距50.5 mm"
+  },
+  "port_ctrl_1": {
+   "center_mm": [
+    -100.8,
+    47.0,
+    91.0
+   ],
+   "size_mm": [
+    37.3,
+    9.5,
+    12.0
+   ],
+   "grade": "照片校准",
+   "note": "手柄口1（第5片区域），内有3组×3针；深度为估计"
+  },
+  "port_ctrl_2": {
+   "center_mm": [
+    -50.3,
+    47.0,
+    91.0
+   ],
+   "size_mm": [
+    37.3,
+    9.5,
+    12.0
+   ],
+   "grade": "照片校准",
+   "note": "手柄口2"
+  },
+  "label_mc_1": {
+   "center_mm": [
+    -100.8,
+    68.6,
+    91.1
+   ],
+   "size_mm": [
+    3.0,
+    4.0,
+    0.1
+   ],
+   "grade": "照片校准",
+   "note": "第2片上印\"1\""
+  },
+  "label_mc_2": {
+   "center_mm": [
+    -50.3,
+    68.6,
+    91.1
+   ],
+   "size_mm": [
+    3.0,
+    4.0,
+    0.1
+   ],
+   "grade": "照片校准",
+   "note": "第2片上印\"2\""
+  },
+  "label_magicgate": {
+   "center_mm": [
+    -74.5,
+    68.6,
+    91.1
+   ],
+   "size_mm": [
+    18.0,
+    3.0,
+    0.1
+   ],
+   "grade": "照片校准",
+   "note": "第2片上印 MAGICGATE"
+  },
+  "usb_panel": {
+   "center_mm": [
+    -120.9,
+    17.0,
+    69.8
+   ],
+   "size_mm": [
+    35.5,
+    25.0,
+    1.0
+   ],
+   "grade": "照片校准",
+   "note": "下层前面左端蓝色塑料面板，x -138.7..-103.2，y≈4.5..29.5（上缘被悬挑遮挡，偏估计）"
+  },
+  "usb_1": {
+   "center_mm": [
+    -128.3,
+    22.0,
+    70.0
+   ],
+   "size_mm": [
+    13.3,
+    6.5,
+    10.0
+   ],
+   "grade": "照片校准",
+   "note": "上方 USB-A（含金属壳外框），与 usb_2 竖向间距约8.7 mm"
+  },
+  "usb_2": {
+   "center_mm": [
+    -128.3,
+    13.3,
+    70.0
+   ],
+   "size_mm": [
+    13.3,
+    6.5,
+    10.0
+   ],
+   "grade": "照片校准",
+   "note": "下方 USB-A"
+  },
+  "ilink": {
+   "center_mm": [
+    -112.3,
+    20.2,
+    70.0
+   ],
+   "size_mm": [
+    7.0,
+    4.6,
+    8.0
+   ],
+   "grade": "照片校准",
+   "note": "S400 i.LINK 4针口，上方印 S400▼，下方印 i.LINK 图标"
+  },
+  "logo_ps2_front": {
+   "center_mm": [
+    60.8,
+    54.5,
+    91.5
+   ],
+   "size_mm": [
+    11.5,
+    9.5,
+    1.0
+   ],
+   "grade": "照片校准",
+   "note": "前面只有彩色 PlayStation 家族标（可旋转徽章），位于托盘前脸中央；蓝色 PS2 大标在顶面，见 logo_ps2_top"
+  },
+  "logo_wordmark_front": {
+   "center_mm": [
+    145.6,
+    58.5,
+    91.2
+   ],
+   "size_mm": [
+    5.3,
+    24.0,
+    0.2
+   ],
+   "grade": "照片校准",
+   "note": "前面右端竖排银白 SONY 字标（字母S在上）；前面没有 PlayStation 2 字标"
+  },
+  "vents_front": {
+   "center_mm": [
+    4.5,
+    19.0,
+    70.0
+   ],
+   "size_mm": [
+    187.0,
+    26.0,
+    3.0
+   ],
+   "grade": "照片校准",
+   "note": "下层前面格栅 x -89..+98；下缘 y 6.1（照片可测），上缘 y≈32 为估计；横槽节距约3.1 mm，竖分隔约13–14 mm"
+  },
+  "logo_ps2_top": {
+   "center_mm": [
+    20.5,
+    78.0,
+    0.0
+   ],
+   "size_mm": [
+    24.0,
+    0.1,
+    128.0
+   ],
+   "grade": "照片校准",
+   "note": "顶面蓝色渐变 PS2 标：沿 z 方向读（后→前），字头朝 +x；两台相机交叉得到 x 8.8–33.4, z -65.7..+65.3"
+  },
+  "logo_wordmark_top": {
+   "center_mm": [
+    -1.3,
+    78.0,
+    1.0
+   ],
+   "size_mm": [
+    9.5,
+    0.3,
+    62.0
+   ],
+   "grade": "照片校准",
+   "note": "顶面 PlayStation 2 压纹字标，位于 PS2 标 -x 侧约5.5 mm"
+  },
+  "logos_media_top": {
+   "center_mm": [
+    100.0,
+    78.0,
+    83.0
+   ],
+   "size_mm": [
+    78.0,
+    0.1,
+    9.0
+   ],
+   "grade": "照片校准",
+   "note": "顶面前右角 CD/DOLBY/dts/DVD 标识条（浅压纹）"
+  },
+  "rear_vent_fan": {
+   "center_mm": [
+    -49.3,
+    41.2,
+    -91.0
+   ],
+   "size_mm": [
+    61.3,
+    62.2,
+    3.0
+   ],
+   "grade": "照片校准",
+   "note": "后部风扇格栅，约7行×3列方格，y≈10..72"
+  },
+  "rear_power_switch": {
+   "center_mm": [
+    -112.3,
+    63.1,
+    -91.0
+   ],
+   "size_mm": [
+    20.6,
+    11.8,
+    3.0
+   ],
+   "grade": "照片校准",
+   "note": "MAIN POWER 翘板开关（外框 26.5×15.3）"
+  },
+  "rear_ac_in": {
+   "center_mm": [
+    -112.1,
+    46.8,
+    -91.0
+   ],
+   "size_mm": [
+    26.5,
+    14.7,
+    10.0
+   ],
+   "grade": "照片校准",
+   "note": "AC IN（IEC C8 两芯）插座外框；与电源开关同一凹框"
+  },
+  "rear_optical_out": {
+   "center_mm": [
+    -94.7,
+    16.3,
+    -91.0
+   ],
+   "size_mm": [
+    11.9,
+    11.0,
+    5.0
+   ],
+   "grade": "照片校准",
+   "note": "DIGITAL OUT (OPTICAL) 方口"
+  },
+  "rear_av_multi_out": {
+   "center_mm": [
+    -122.9,
+    15.1,
+    -91.0
+   ],
+   "size_mm": [
+    22.1,
+    8.1,
+    8.0
+   ],
+   "grade": "照片校准",
+   "note": "AV MULTI OUT"
+  },
+  "rear_expansion_bay": {
+   "center_mm": [
+    51.8,
+    21.8,
+    -91.0
+   ],
+   "size_mm": [
+    124.6,
+    30.4,
+    145.0
+   ],
+   "grade": "照片校准",
+   "note": "EXPANSION BAY 开口 x -10.5..+114.1, y 6.6..37；深度145为估计"
+  },
+  "rear_bay_cover": {
+   "center_mm": [
+    51.8,
+    21.8,
+    -91.5
+   ],
+   "size_mm": [
+    128.0,
+    32.0,
+    2.0
+   ],
+   "grade": "估计",
+   "note": "零售机附带的 EXPANSION BAY 盖板，按 BR 照片目估比开口略大"
+  },
+  "rear_label": {
+   "center_mm": [
+    67.0,
+    58.5,
+    -91.0
+   ],
+   "size_mm": [
+    125.8,
+    24.5,
+    0.2
+   ],
+   "grade": "照片校准",
+   "note": "上层后面铭牌贴纸区（型号/序列号）"
+  },
+  "foot_bottom_1": {
+   "center_mm": [
+    -144.0,
+    0.8,
+    -78.0
+   ],
+   "size_mm": [
+    7.5,
+    1.5,
+    7.5
+   ],
+   "grade": "照片校准",
+   "note": "底面方形橡胶螺丝盖兼脚垫（iFixit 底面照，以下层底面 273×161 为比例）；高度1.5为估计"
+  },
+  "foot_bottom_2": {
+   "center_mm": [
+    -17.8,
+    0.8,
+    -81.0
+   ],
+   "size_mm": [
+    7.5,
+    1.5,
+    7.5
+   ],
+   "grade": "照片校准",
+   "note": "底面方形橡胶螺丝盖兼脚垫（iFixit 底面照，以下层底面 273×161 为比例）；高度1.5为估计"
+  },
+  "foot_bottom_3": {
+   "center_mm": [
+    110.5,
+    0.8,
+    -79.0
+   ],
+   "size_mm": [
+    7.5,
+    1.5,
+    7.5
+   ],
+   "grade": "照片校准",
+   "note": "底面方形橡胶螺丝盖兼脚垫（iFixit 底面照，以下层底面 273×161 为比例）；高度1.5为估计"
+  },
+  "foot_bottom_4": {
+   "center_mm": [
+    -140.3,
+    0.8,
+    40.2
+   ],
+   "size_mm": [
+    7.5,
+    1.5,
+    7.5
+   ],
+   "grade": "照片校准",
+   "note": "底面方形橡胶螺丝盖兼脚垫（iFixit 底面照，以下层底面 273×161 为比例）；高度1.5为估计"
+  },
+  "foot_bottom_5": {
+   "center_mm": [
+    -22.1,
+    0.8,
+    62.7
+   ],
+   "size_mm": [
+    7.5,
+    1.5,
+    7.5
+   ],
+   "grade": "照片校准",
+   "note": "底面方形橡胶螺丝盖兼脚垫（iFixit 底面照，以下层底面 273×161 为比例）；高度1.5为估计"
+  },
+  "foot_bottom_6": {
+   "center_mm": [
+    107.0,
+    0.8,
+    62.7
+   ],
+   "size_mm": [
+    7.5,
+    1.5,
+    7.5
+   ],
+   "grade": "照片校准",
+   "note": "底面方形橡胶螺丝盖兼脚垫（iFixit 底面照，以下层底面 273×161 为比例）；高度1.5为估计"
+  },
+  "pad_side_left_1": {
+   "center_mm": [
+    -151.0,
+    71.0,
+    -70.0
+   ],
+   "size_mm": [
+    1.5,
+    13.0,
+    8.0
+   ],
+   "grade": "估计",
+   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm"
+  },
+  "pad_side_left_2": {
+   "center_mm": [
+    -151.0,
+    8.0,
+    -75.0
+   ],
+   "size_mm": [
+    1.5,
+    13.0,
+    8.0
+   ],
+   "grade": "估计",
+   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm"
+  },
+  "pad_side_left_3": {
+   "center_mm": [
+    -151.0,
+    71.0,
+    75.0
+   ],
+   "size_mm": [
+    1.5,
+    13.0,
+    8.0
+   ],
+   "grade": "估计",
+   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm"
+  },
+  "pad_side_left_4": {
+   "center_mm": [
+    -151.0,
+    14.0,
+    62.0
+   ],
+   "size_mm": [
+    1.5,
+    13.0,
+    8.0
+   ],
+   "grade": "估计",
+   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm"
+  }
+ },
+ "colors": {
+  "body": "#242426",
+  "body_photo_lit_ref": "#4D4D4D",
+  "fins": "#242426",
+  "tray_face": "#202022",
+  "buttons": "#1C1C1E",
+  "fan_grille_dark": "#111112",
+  "usb_panel_blue": "#2E5AA6",
+  "logo_ps2_top_violet": "#757ABB",
+  "logo_ps2_top_cyan": "#92CAE9",
+  "wordmark_top_emboss": "#1C1C1E",
+  "reset_icon_teal": "#3FBFB0",
+  "eject_icon_blue": "#6F86D6",
+  "sony_front_silver": "#D6D6D6",
+  "print_white": "#E6E6E6",
+  "ps_logo_red": "#D52B1E",
+  "ps_logo_yellow": "#F2B43A",
+  "ps_logo_green": "#2FA39A",
+  "ps_logo_blue": "#2F6FB0",
+  "led_standby_red": "#FF2A1A",
+  "led_on_green": "#35E06A",
+  "led_eject_blue": "#3A7BFF"
+ },
+ "fins": {
+  "count": 6,
+  "pitch_mm": 7.28,
+  "groove_depth_mm": 3.0,
+  "faces": "front(z=+91) and right side(x=+150.5)",
+  "y_ranges_mm": [
+   [
+    73.5,
+    78.0
+   ],
+   [
+    66.5,
+    70.8
+   ],
+   [
+    59.3,
+    63.6
+   ],
+   [
+    52.0,
+    56.2
+   ],
+   [
+    44.8,
+    48.9
+   ],
+   [
+    37.7,
+    41.6
+   ]
+  ],
+  "grade": "照片校准",
+  "note": "前面(FR照片)与后侧剖面(背面照片)两种独立测量相差<0.8 mm"
+ },
+ "meta": {
+  "model": "SCPH-30001 (NTSC-U/C, black)",
+  "weight_kg": 2.2,
+  "weight_grade": "官方",
+  "coords": "mm; origin=bbox bottom-center; x right+, y up+, z front+ (front fin face z=+91, rear z=-91)",
+  "grade_values": "官方 / 交叉验证 / 照片校准 / 估计(无可测依据，仅供建模占位)",
+  "notes_file": "PS2_Model/REFERENCE_NOTES_console.md"
+ },
+ "motions": [
+  {
+   "node": "DISC_TRAY",
+   "axis": "loc_z",
+   "range_m": [
+    0,
+    0.135
+   ]
+  },
+  {
+   "node": "BTN_RESET",
+   "axis": "loc_z",
+   "range_m": [
+    -0.001,
+    0
+   ]
+  },
+  {
+   "node": "BTN_EJECT",
+   "axis": "loc_z",
+   "range_m": [
+    -0.001,
+    0
+   ]
+  }
+ ]
+}
