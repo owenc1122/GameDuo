@@ -215,7 +215,8 @@ def validate(name, spec, tolerance):
         return path, result
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.wm.usd_import(filepath=str(path))
+    # Keep every USD Xform as its own object so single-child groups keep their names.
+    bpy.ops.wm.usd_import(filepath=str(path), merge_parent_xform=False)
     stage = Usd.Stage.Open(str(path))
     up_axis, meters = UsdGeom.GetStageUpAxis(stage), UsdGeom.GetStageMetersPerUnit(stage)
     if up_axis != 'Y':

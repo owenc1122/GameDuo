@@ -1,11 +1,134 @@
 {
   "PS2-Console": {
     "file": "PS2_Model/exports/PS2-Console.usdz",
-    "reasons": [
-      "file not found: PS2_Model/exports/PS2-Console.usdz"
+    "reasons": [],
+    "missing_nodes": [],
+    "size_mm_measured": [
+      301.0,
+      78.04,
+      182.16
     ],
-    "passed": false,
-    "checked_at": "2026-09-23T02:14:03+00:00"
+    "size_mm_target": [
+      301,
+      78,
+      182
+    ],
+    "tris": 16321,
+    "max_tris": 60000,
+    "motion_results": [
+      {
+        "motion": {
+          "node": "DISC_TRAY",
+          "axis": "loc_z",
+          "range_m": [
+            0,
+            0.135
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": 0,
+            "collisions": []
+          },
+          {
+            "value": 0.135,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "BTN_RESET",
+          "axis": "loc_z",
+          "range_m": [
+            -0.001,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.001,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "BTN_EJECT",
+          "axis": "loc_z",
+          "range_m": [
+            -0.001,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.001,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "MC_DOOR_1",
+          "axis": "rot_x",
+          "range_rad": [
+            0,
+            1.5708
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": 0,
+            "collisions": []
+          },
+          {
+            "value": 1.5708,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "MC_DOOR_2",
+          "axis": "rot_x",
+          "range_rad": [
+            0,
+            1.5708
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": 0,
+            "collisions": []
+          },
+          {
+            "value": 1.5708,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      }
+    ],
+    "passed": true,
+    "checked_at": "2026-09-23T03:15:19+00:00"
   },
   "PS2-MemoryCard": {
     "file": "PS2_Model/exports/PS2-MemoryCard.usdz",
@@ -13,7 +136,7 @@
     "missing_nodes": [],
     "size_mm_measured": [
       42.0,
-      7.7,
+      7.5,
       56.5
     ],
     "size_mm_target": [
@@ -21,18 +144,449 @@
       7.5,
       56.5
     ],
-    "tris": 2834,
+    "tris": 2780,
     "max_tris": 3000,
     "motion_results": [],
     "passed": true,
-    "checked_at": "2026-09-23T02:24:53+00:00"
+    "checked_at": "2026-09-23T03:15:19+00:00"
   },
   "PS2-DualShock2": {
     "file": "PS2_Model/exports/PS2-DualShock2.usdz",
-    "reasons": [
-      "file not found: PS2_Model/exports/PS2-DualShock2.usdz"
+    "reasons": [],
+    "missing_nodes": [],
+    "size_mm_measured": [
+      157.037,
+      62.0,
+      95.008
     ],
-    "passed": false,
-    "checked_at": "2026-09-23T02:14:03+00:00"
+    "size_mm_target": [
+      157.0,
+      62.0,
+      95.0
+    ],
+    "tris": 37068,
+    "max_tris": 40000,
+    "motion_results": [
+      {
+        "motion": {
+          "node": "BTN_TRIANGLE",
+          "axis": "loc_y",
+          "range_m": [
+            -0.002,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.002,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "BTN_CIRCLE",
+          "axis": "loc_y",
+          "range_m": [
+            -0.002,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.002,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "BTN_CROSS",
+          "axis": "loc_y",
+          "range_m": [
+            -0.002,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.002,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "BTN_SQUARE",
+          "axis": "loc_y",
+          "range_m": [
+            -0.002,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.002,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "BTN_SELECT",
+          "axis": "loc_y",
+          "range_m": [
+            -0.001,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.001,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "BTN_START",
+          "axis": "loc_y",
+          "range_m": [
+            -0.001,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.001,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "BTN_ANALOG",
+          "axis": "loc_y",
+          "range_m": [
+            -0.0008,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.0008,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "L1",
+          "axis": "loc_y",
+          "range_m": [
+            -0.002,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.002,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "R1",
+          "axis": "loc_y",
+          "range_m": [
+            -0.002,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.002,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "L2",
+          "axis": "rot_x",
+          "range_rad": [
+            -0.1396,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.1396,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "R2",
+          "axis": "rot_x",
+          "range_rad": [
+            -0.1396,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.1396,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "STICK_L",
+          "axis": "rot_x",
+          "range_rad": [
+            -0.4363,
+            0.4363
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.4363,
+            "collisions": []
+          },
+          {
+            "value": 0.4363,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "STICK_L",
+          "axis": "rot_z",
+          "range_rad": [
+            -0.4363,
+            0.4363
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.4363,
+            "collisions": []
+          },
+          {
+            "value": 0.4363,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "STICK_R",
+          "axis": "rot_x",
+          "range_rad": [
+            -0.4363,
+            0.4363
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.4363,
+            "collisions": []
+          },
+          {
+            "value": 0.4363,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "STICK_R",
+          "axis": "rot_z",
+          "range_rad": [
+            -0.4363,
+            0.4363
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.4363,
+            "collisions": []
+          },
+          {
+            "value": 0.4363,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "STICK_L",
+          "axis": "loc_y",
+          "range_m": [
+            -0.0008,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.0008,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "STICK_R",
+          "axis": "loc_y",
+          "range_m": [
+            -0.0008,
+            0
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.0008,
+            "collisions": []
+          },
+          {
+            "value": 0,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "DPAD",
+          "axis": "rot_x",
+          "range_rad": [
+            -0.0873,
+            0.0873
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.0873,
+            "collisions": []
+          },
+          {
+            "value": 0.0873,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      },
+      {
+        "motion": {
+          "node": "DPAD",
+          "axis": "rot_z",
+          "range_rad": [
+            -0.0873,
+            0.0873
+          ]
+        },
+        "errors": [],
+        "ends": [
+          {
+            "value": -0.0873,
+            "collisions": []
+          },
+          {
+            "value": 0.0873,
+            "collisions": []
+          }
+        ],
+        "passed": true
+      }
+    ],
+    "passed": true,
+    "checked_at": "2026-09-23T03:15:20+00:00"
   }
 }

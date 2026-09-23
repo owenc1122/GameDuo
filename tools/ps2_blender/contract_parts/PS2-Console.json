@@ -172,7 +172,7 @@
     8.0
    ],
    "grade": "照片校准",
-   "note": "存储卡槽1（第3片区域，含上下缝），槽面印 MEMORY CARD；深度为估计"
+   "note": "存储卡槽1（第3片区域，含上下缝），槽面印 MEMORY CARD；深度为估计；模型：卡槽通道 43×8.3 mm，深到 z=49.0；SLOT_MC 锚点 (x,61.5,49.5)=插到底时存储卡接口端面中心，卡插入 41.5 mm、外露 15 mm（外露量按 scph30007r_front.jpg 目估，估计）；未建弹簧挡板（静态挡板会与插入的卡相交），空槽显示为深色槽口"
   },
   "slot_mc_2": {
    "center_mm": [
@@ -186,7 +186,7 @@
     8.0
    ],
    "grade": "照片校准",
-   "note": "存储卡槽2，与槽1间距50.5 mm"
+   "note": "存储卡槽2，与槽1间距50.5 mm；模型：卡槽通道 43×8.3 mm，深到 z=49.0；SLOT_MC 锚点 (x,61.5,49.5)=插到底时存储卡接口端面中心，卡插入 41.5 mm、外露 15 mm（外露量按 scph30007r_front.jpg 目估，估计）；未建弹簧挡板（静态挡板会与插入的卡相交），空槽显示为深色槽口"
   },
   "port_ctrl_1": {
    "center_mm": [
@@ -200,7 +200,7 @@
     12.0
    ],
    "grade": "照片校准",
-   "note": "手柄口1（第5片区域），内有3组×3针；深度为估计"
+   "note": "手柄口1（第5片区域），内有3组×3针；深度为估计；模型：插口凹槽 41.8×9.3 mm、深 9.2 mm（容纳手柄插头 40×7.5×9 唇部 + 41×8.5 台阶），3 个针座 10.4×4.1 mm 伸进插头的 3 个窗口；PORT_CTRL 锚点 (x,47.0,82.3)=插到底时插头唇部端面中心，插头本体前面离鳍片 0.3 mm"
   },
   "port_ctrl_2": {
    "center_mm": [
@@ -214,7 +214,7 @@
     12.0
    ],
    "grade": "照片校准",
-   "note": "手柄口2"
+   "note": "手柄口2；模型：插口凹槽 41.8×9.3 mm、深 9.2 mm（容纳手柄插头 40×7.5×9 唇部 + 41×8.5 台阶），3 个针座 10.4×4.1 mm 伸进插头的 3 个窗口；PORT_CTRL 锚点 (x,47.0,82.3)=插到底时插头唇部端面中心，插头本体前面离鳍片 0.3 mm"
   },
   "label_mc_1": {
    "center_mm": [
@@ -326,7 +326,7 @@
     1.0
    ],
    "grade": "照片校准",
-   "note": "前面只有彩色 PlayStation 家族标（可旋转徽章），位于托盘前脸中央；蓝色 PS2 大标在顶面，见 logo_ps2_top"
+   "note": "前面只有彩色 PlayStation 家族标（可旋转徽章），位于托盘前脸中央；蓝色 PS2 大标在顶面，见 logo_ps2_top；模型：为保持在托盘前脸内（否则弹出时悬空），实际放在 y=56.35、10.8×8.2 mm（下缘=托盘下沿，上缘略进上片），见 ifixit 右前特写"
   },
   "logo_wordmark_front": {
    "center_mm": [
@@ -606,7 +606,7 @@
     8.0
    ],
    "grade": "估计",
-   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm"
+   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm；模型：左侧面在 x=-149.5，垫子凸出 1.0 mm 到 -150.5，使含垫总宽=301（估计）"
   },
   "pad_side_left_2": {
    "center_mm": [
@@ -620,7 +620,7 @@
     8.0
    ],
    "grade": "估计",
-   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm"
+   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm；模型：左侧面在 x=-149.5，垫子凸出 1.0 mm 到 -150.5，使含垫总宽=301（估计）"
   },
   "pad_side_left_3": {
    "center_mm": [
@@ -634,7 +634,7 @@
     8.0
    ],
    "grade": "估计",
-   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm"
+   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm；模型：左侧面在 x=-149.5，垫子凸出 1.0 mm 到 -150.5，使含垫总宽=301（估计）"
   },
   "pad_side_left_4": {
    "center_mm": [
@@ -648,7 +648,7 @@
     8.0
    ],
    "grade": "估计",
-   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm"
+   "note": "左侧(x-)竖放用小橡胶垫，位置照片目估，误差可达±5 mm；模型：左侧面在 x=-149.5，垫子凸出 1.0 mm 到 -150.5，使含垫总宽=301（估计）"
   }
  },
  "colors": {
@@ -740,6 +740,77 @@
     -0.001,
     0
    ]
+  },
+  {
+   "node": "MC_DOOR_1",
+   "axis": "rot_x",
+   "range_rad": [
+    0,
+    1.5708
+   ]
+  },
+  {
+   "node": "MC_DOOR_2",
+   "axis": "rot_x",
+   "range_rad": [
+    0,
+    1.5708
+   ]
   }
+ ],
+ "build_notes": {
+  "body_left_face_x_mm": -149.5,
+  "body_bottom_y_mm": 1.0,
+  "feet_height_mm": 1.4,
+  "tray_cavity_mm": {
+   "x": [
+    -3.0,
+    123.5
+   ],
+   "y": [
+    51.8,
+    63.9
+   ],
+   "z": [
+    -65.5,
+    93.0
+   ]
+  },
+  "tray_mm": {
+   "x": [
+    -2.6,
+    123.1
+   ],
+   "y": [
+    52.2,
+    63.5
+   ],
+   "z_closed": [
+    -65.0,
+    91.0
+   ],
+   "clearance": 0.4
+  },
+  "disc_seat": "TRAY_DISC_ANCHOR (60.3, 56.6, 18.0) mm with tray closed = disc centre at mid-thickness on the 120 mm well floor y 56.0; disc centre 73 mm behind the tray front (notes)",
+  "buttons": "caps 11x10.5x5.5 mm, face flush z=91, pocket +0.4 mm each side, pocket floor z=84.0 (0.5 mm behind the pressed cap)",
+  "leds": "LED_POWER / LED_EJECT are children of BTN_RESET / BTN_EJECT (lens on the key cap corner, moves with the key)",
+  "grade": "估计",
+  "mc_doors": "MC_DOOR_1/2 = 存储卡槽弹簧门（印 MEMORY CARD），枢轴在铰链线 (x, 65.45, 89.6)，静止=关闭；rot_x 0→+π/2 向内上翻进门袋。门关闭时插入的卡会与门相交，App 插卡前须先把对应的门转到 +π/2（或隐藏）。"
+ },
+ "nodes": [
+  "DISC_TRAY",
+  "TRAY_DISC_ANCHOR",
+  "BTN_RESET",
+  "BTN_EJECT",
+  "LED_POWER",
+  "LED_EJECT",
+  "PORT_CTRL_1",
+  "PORT_CTRL_2",
+  "SLOT_MC_1",
+  "SLOT_MC_2",
+  "TRADEMARK_PRINTS",
+  "MC_DOOR_1",
+  "MC_DOOR_2",
+  "TRADEMARK_PRINTS_TRAY"
  ]
 }
