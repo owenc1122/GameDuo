@@ -52,7 +52,7 @@ PS2 DVD-ROM 游戏光盘（NTSC-U/C，120 mm 单面）和美版黑色 Amaray PS2
 | `COVER_ART` | 封面材质槽（`CASE_LID` 下） | 见下文“封面贴图” |
 | `COVER_ART_SPINE` | 书脊封面材质槽（`CASE_SPINE` 下） | 同上 |
 | `COVER_ART_BACK` | 封底材质槽（`CASE_TRAY` 下） | 同上 |
-| `TRADEMARK_PRINTS` | 顶层商标组（空；所有印刷都要跟随可动部件，所以分在下面两个组里） | — |
+| `TRADEMARK_PRINTS` | 顶层商标组（根节点下，静态）：托盘底面记忆卡座旁的模压 PS 标志 `TRAY_PS_LOGO_EMBOSS`；跟随可动部件的印刷分在下面两个组里 | — |
 | `TRADEMARK_PRINTS_SPINE` | `CASE_SPINE` 下：书脊黑色横带、白框彩色 PS 标志、竖排 “PlayStation 2” 字标 | — |
 | `TRADEMARK_PRINTS_LID` | `CASE_LID` 下：封面顶部黑色横幅、白色 “PlayStation 2” 字标、彩色 PS 标志 | — |
 
@@ -96,7 +96,7 @@ PS2 DVD-ROM 游戏光盘（NTSC-U/C，120 mm 单面）和美版黑色 Amaray PS2
 | 光盘 | `TRADEMARK_PRINTS`（标签印刷与中心全息） |
 | 光盘盒 | `TRADEMARK_PRINTS`、`TRADEMARK_PRINTS_SPINE`、`TRADEMARK_PRINTS_LID`（三个一起隐藏） |
 
-注意：盒内托盘底面的模压标记在 `TRAY_EMBOSS` 网格里（记忆卡座旁的 PS 标志和箭头、MEMORY CARD HOLDER、卡座按钮上的 PUSH、AMARAY），不在任何商标组下，隐藏上面三个组不会去掉这个 PS 标志；如需完全去掉，额外隐藏 `TRAY_EMBOSS`（会连同其余模压文字一起隐藏）。书脊内侧的专利号模压 `SPINE_EMBOSS` 不是商标。
+隐藏这三个组即可去掉盒子上全部商标，包括托盘底面的模压 PS 标志（`TRAY_PS_LOGO_EMBOSS`，在 `TRADEMARK_PRINTS` 下）。`TRAY_EMBOSS` 里只剩非商标的模压（箭头、MEMORY CARD HOLDER、卡座按钮上的 PUSH、AMARAY），书脊内侧的专利号模压 `SPINE_EMBOSS` 也不是商标，都不需要隐藏。
 
 ## 尺寸与面数
 
@@ -107,7 +107,7 @@ PS2 DVD-ROM 游戏光盘（NTSC-U/C，120 mm 单面）和美版黑色 Amaray PS2
 | 光盘 | 120 × 1.2 × 120 | 120.0 × 1.455 × 120.0 | 3,774 / 4,000 |
 | 光盘盒 | 135 × 190 × 14 | 135.0 × 190.0 × 14.0 | 5,104 / 11,000 |
 
-光盘厚度实测多出的 0.255 mm 是标签面上的堆叠环（0.2 mm）以及浮在盘面上的标签层和印刷层，在容差内。盒子加光盘共 8,878 面，低于设计预算 15,000。
+光盘厚度实测多出的 0.255 mm 是数据面下方凸起 0.2 mm 的堆叠环，以及浮在标签面上的标签层和印刷层，在容差内。盒子加光盘共 8,878 面，低于设计预算 15,000。
 
 ## 精度边界
 

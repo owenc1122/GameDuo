@@ -24,14 +24,15 @@ Nodes
       TRAY_SHELL                    black PP back half (rounded corners, bevelled edges)
       HUB_ROSETTE                   seat, 6 rosette fingers, triangular button (+PUSH emboss)
       DISC_RING                     4 raised retaining arcs around the disc
-      MEMCARD_HOLDER, TRAY_EMBOSS   corner brackets; embossed PS logo / arrow /
-                                    MEMORY CARD HOLDER / AMARAY
+      MEMCARD_HOLDER, TRAY_EMBOSS   corner brackets; embossed arrow / MEMORY CARD
+                                    HOLDER / AMARAY / PUSH (PS logo: TRADEMARK_PRINTS)
       SLEEVE_BACK, COVER_ART_BACK   clear film and insert back panel
       TRAY_HINGE_WEB                living-hinge strip (the lid has LID_HINGE_WEB)
       CASE_DISC_ANCHOR              empty at the hub, disc centre, rotated +90 deg about X
                                     so the disc's +Y (label) faces +Z (the lid)
-    TRADEMARK_PRINTS                top-level print group (empty: every print must follow
-                                    a moving part, see the two groups below)
+    TRADEMARK_PRINTS                top-level print group: TRAY_PS_LOGO_EMBOSS (embossed PS
+                                    logo on the tray floor); moving prints are in the
+                                    SPINE / LID groups below
     CASE_SPINE_HINGE                empty ON the back hinge line, rotated pi about X so
                                     its local +Y = world -Y (contract hinge_axis_dir)
       CASE_SPINE                    identity rest transform = runtime pivot; +rot_y opens
@@ -227,8 +228,13 @@ def build():
 
     # embossed marks on the tray floor / hub button (flat, slightly lighter plastic)
     Me = D.basis((0, 0, m(floor_z + 0.15)), (1, 0, 0), (0, 1, 0))
+    # the embossed PS logo is a trademark: own mesh under the root-level TRADEMARK_PRINTS
+    # (tray is static under the root, so the logo stays in place when the group moves/hides)
+    prints_root = C.empty('TRADEMARK_PRINTS', parent=root)
     bm = D.new_bm()
     D.add_ps_logo(bm, m(mx + 3), m(my + 7.5), m(13.0), m(10.0), Me)
+    D.finish('TRAY_PS_LOGO_EMBOSS', bm, [emboss], recalc=False, parent=prints_root)
+    bm = D.new_bm()
     D.add_flat(bm, [(m(mx - 22), m(my + 7.5)), (m(mx - 17.5), m(my + 4.5)),
                     (m(mx - 17.5), m(my + 10.5))], Me)
     D.add_text(bm, 'MEMORY CARD', m(mx + 1), m(my - 5.5), m(30.0), m(3.4), Me, res=1)
@@ -250,7 +256,6 @@ def build():
     C.empty('CASE_DISC_ANCHOR', parent=tray,
             location=(m(hx), m(hy), m(seat_z + 0.6)), rotation=(math.pi / 2, 0, 0))
 
-    C.empty('TRADEMARK_PRINTS', parent=root)
 
     # ================================================================ spine
     spine_hinge = C.empty('CASE_SPINE_HINGE', parent=root,
