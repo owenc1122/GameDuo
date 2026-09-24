@@ -48,6 +48,7 @@ struct ContentView: View {
                     onReturned: finishExit, onSettings: { showingSettings = true },
                     isVisible: !libraryHidden
                 )
+                .equatable()
                 .id(libraryGeneration)
                 .opacity(libraryHidden ? 0 : 1)
                 .allowsHitTesting(!libraryHidden && !isExiting)

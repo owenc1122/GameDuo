@@ -1657,11 +1657,13 @@ struct GameLibraryView: View {
                     }
                     .font(.system(size: 12))
                     .foregroundStyle(.white.opacity(0.55))
+                    // One lookup for all dots: `selectedIndex` scans the library (and standardizes every URL).
+                    let dot = min(selectedIndex, 8)
                     HStack(spacing: 5) {
                         ForEach(0..<min(library.games.count, 9), id: \.self) { index in
                             Capsule()
-                                .fill(.white.opacity(index == min(selectedIndex, 8) ? 0.8 : 0.18))
-                                .frame(width: index == min(selectedIndex, 8) ? 18 : 4, height: 4)
+                                .fill(.white.opacity(index == dot ? 0.8 : 0.18))
+                                .frame(width: index == dot ? 18 : 4, height: 4)
                         }
                     }
                     .padding(.top, 9)
@@ -1740,6 +1742,18 @@ struct GameLibraryView: View {
       }
     }
 
+}
+
+/// ContentView observes the emulator session, so every emulated frame (`topImage` / `bottomImage`)
+/// rebuilds it and, without this, the whole library view as well — hidden under the game but still
+/// re-evaluated 60–120 times a second on the main thread, which starved frame presentation for
+/// every core. The library only needs a new body when these inputs change; `library` publishes to
+/// this view directly, and the callbacks reach ContentView's state through its property wrappers.
+extension GameLibraryView: Equatable {
+    static func == (lhs: GameLibraryView, rhs: GameLibraryView) -> Bool {
+        lhs.library === rhs.library && lhs.isExiting == rhs.isExiting
+            && lhs.highlightImport == rhs.highlightImport && lhs.isVisible == rhs.isVisible
+    }
 }
 
 /// A low-contrast, segmented cue that communicates the next vertical gesture
