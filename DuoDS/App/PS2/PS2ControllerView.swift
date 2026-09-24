@@ -29,8 +29,11 @@ enum PS2Shoulder: CaseIterable {
 
 /// Model-space (metre) numbers for the top-down DualShock 2 layout. See PS2_Model/README.md.
 enum PS2ControllerMetrics {
-    /// Space reserved above the body for the flat L1/L2/R1/R2 buttons.
-    static let shoulderRowDepth: CGFloat = 0.028
+    /// Space reserved above the body for the flat L1/L2/R1/R2 buttons: L1 (9.5 mm) covers the
+    /// body's empty shoulder tabs (4.5 mm), then a 1 mm gap and L2 (11 mm), plus 1 mm headroom.
+    static let shoulderRowDepth: CGFloat = 0.018
+    /// How far the flat L1/R1 buttons reach down over the body's shoulder tabs.
+    static let shoulderTabDepth: CGFloat = 4.5
     static let cableRadius: Float = 0.002
     static let cableExit = SIMD3<Float>(0, 0.0385, -0.033)
     /// The model's ribbed strain-relief boot (`CABLE` mesh): (offset along the cable from
@@ -123,6 +126,16 @@ final class PS2ControllerModel {
             bind(node)
             node.enumerateChildNodes { child, _ in bind(child) }
             shadeMaterials[name] = materials
+        }
+        // The flat L1/L2/R1/R2 buttons replace the model's own shoulder buttons; hidden before the
+        // footprint is measured, so the flat row sits right against the body.
+        for name in ["L1", "L2", "R1", "R2"] {
+            guard let node = nodes[name] else { continue }
+            node.isHidden = true
+            if let mount = node.parent, mount.name?.hasSuffix("_MOUNT") == true { mount.isHidden = true }
+        }
+        for name in ["PRINT_L", "PRINT_R"] {
+            scene.rootNode.childNode(withName: name, recursively: true)?.isHidden = true
         }
         // The static cable and plug are replaced by the live cable to the console.
         scene.rootNode.childNode(withName: "CABLE", recursively: true)?.isHidden = true
@@ -501,10 +514,10 @@ final class PS2ControllerTouchView: UIView {
         let mm = model.points(millimetres:)
         let x = model.restPoint(shoulder.isLeft ? "L1" : "R1").x
         let width = mm(22)
-        let l1Bottom = bodyRect.minY - mm(1.5)
+        let l1Bottom = bodyRect.minY + mm(PS2ControllerMetrics.shoulderTabDepth)
         if shoulder.isTrigger {
             let height = mm(11)
-            let bottom = l1Bottom - mm(9.5) - mm(2.5)
+            let bottom = l1Bottom - mm(9.5) - mm(1)
             return CGRect(x: x - width / 2, y: bottom - height, width: width, height: height)
         }
         let height = mm(9.5)

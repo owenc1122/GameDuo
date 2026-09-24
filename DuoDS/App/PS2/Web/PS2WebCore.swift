@@ -74,6 +74,12 @@ final class PS2WebCore: NSObject, ObservableObject, PS2InputSink {
         webView.backgroundColor = .black
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        // No scroll edge effect: it dimmed a band under the status bar over the picture's
+        // blurred surround, ending in a hard line.
+        for effect in [webView.scrollView.topEdgeEffect, webView.scrollView.bottomEdgeEffect,
+                       webView.scrollView.leftEdgeEffect, webView.scrollView.rightEdgeEffect] {
+            effect.isHidden = true
+        }
         webView.isUserInteractionEnabled = false
         webView.navigationDelegate = self
         #if DEBUG
@@ -174,6 +180,23 @@ final class PS2WebCore: NSObject, ObservableObject, PS2InputSink {
     }
     #endif
 
+    // MARK: Picture
+
+    private var pictureRect: CGRect?
+
+    /// Where the page draws the picture (web view points); the rest of the view gets the blurred
+    /// surround.
+    func setPicture(_ rect: CGRect) {
+        guard rect != pictureRect, rect.width > 0, rect.height > 0 else { return }
+        pictureRect = rect
+        sendPicture()
+    }
+
+    private func sendPicture() {
+        guard let rect = pictureRect else { return }
+        call("window.duo && window.duo.setPicture(\(rect.minX), \(rect.minY), \(rect.width), \(rect.height))")
+    }
+
     // MARK: Input
 
     func setPS2Button(_ id: Int, pressed: Bool) {
@@ -207,12 +230,27 @@ final class PS2WebCore: NSObject, ObservableObject, PS2InputSink {
         case "booted":
             log("booted in \(message["ms"] ?? "?") ms, card files \(message["cardFiles"] ?? 0)")
             if state == .booting { state = .running }
+            sendPicture()
             call("window.duo.resize()")
             if pad != PS2PadState() { sentPad = PS2PadState(); schedulePad() }
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-ps2-core-card-selftest") { runCardSelfTest() }
-            if ProcessInfo.processInfo.arguments.contains("-ps2-core-audio-capture") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.call("window.duo.debugCaptureAudio(10)") }
+            // `-ps2-core-audio-capture [delay]` records 10 s of output, 20 s (or `delay` s) after boot.
+            let arguments = ProcessInfo.processInfo.arguments
+            if let i = arguments.firstIndex(of: "-ps2-core-audio-capture") {
+                let delay = arguments.indices.contains(i + 1) ? Double(arguments[i + 1]) ?? 20 : 20
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.call("window.duo.debugCaptureAudio(10)") }
+            }
+            // `-ps2-core-press 8:0,11:0` taps libretro button id 0 (✕) 8 s and 11 s after boot.
+            if let i = arguments.firstIndex(of: "-ps2-core-press"), arguments.indices.contains(i + 1) {
+                for step in arguments[i + 1].split(separator: ",") {
+                    let parts = step.split(separator: ":")
+                    guard parts.count == 2, let at = Double(parts[0]), let id = Int(parts[1]) else { continue }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + at) { [weak self] in
+                        self?.setPS2Button(id, pressed: true)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { self?.setPS2Button(id, pressed: false) }
+                    }
+                }
             }
             #endif
         case "firstFrame":

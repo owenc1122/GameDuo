@@ -150,6 +150,37 @@ final class PS2CoverArtTests: XCTestCase {
         XCTAssertFalse(multi.contains { $0.hasPrefix("cover.") || $0.hasPrefix("folder.") || $0.hasPrefix("Cover.") })
     }
 
+    // MARK: Back covers
+
+    func testOPLSerial() {
+        XCTAssertEqual(PS2CoverResolver.oplSerial("SLUS-20312"), "SLUS_203.12")
+        XCTAssertEqual(PS2CoverResolver.oplSerial(" slps-25245 "), "SLPS_252.45")
+        XCTAssertNil(PS2CoverResolver.oplSerial("SLPMS-2548"))
+        XCTAssertNil(PS2CoverResolver.oplSerial("SLUS_203.12"))
+        XCTAssertNil(PS2CoverResolver.oplSerial("../../etc"))
+    }
+
+    func testBackDownloadsFromOPLDatabaseAndCaches() async {
+        let io = FakeIO()
+        io.downloadResult = .success(png(242, 344))
+        let data = await makeResolver(io).resolve(romURL: rom, serial: "SLUS-20312", directoryHasSingleGame: false, side: .back)
+        XCTAssertNotNil(data)
+        XCTAssertEqual(io.downloads.map(\.absoluteString),
+                       ["https://raw.githubusercontent.com/Luden02/psx-ps2-opl-art-database/main/PS2/SLUS_203.12/SLUS_203.12_COV2.png"])
+        XCTAssertNotNil(io.writes[cacheDir.appendingPathComponent("SLUS-20312.back.png").path])
+    }
+
+    func testBackLocalCandidatesDoNotOverlapFront() {
+        let resolver = makeResolver(FakeIO())
+        let back = resolver.localCandidates(for: rom, directoryHasSingleGame: true, side: .back).map(\.lastPathComponent)
+        let front = Set(resolver.localCandidates(for: rom, directoryHasSingleGame: true).map(\.lastPathComponent))
+        XCTAssertEqual(back.first, "Ratchet & Clank.back.jpg")
+        XCTAssertTrue(back.contains("back.png"))
+        XCTAssertTrue(front.isDisjoint(with: back))
+        XCTAssertFalse(resolver.localCandidates(for: rom, directoryHasSingleGame: false, side: .back)
+            .contains { $0.lastPathComponent.hasPrefix("back.") })
+    }
+
     // MARK: Crop
 
     func testCropWideImage() {
@@ -228,6 +259,12 @@ final class PS2CoverArtTests: XCTestCase {
 
         let missing = await resolver.resolve(romURL: missingROM, serial: "SLUS-99999", directoryHasSingleGame: false)
         XCTAssertNil(missing)
+
+        let back = await resolver.resolve(romURL: missingROM, serial: "SLUS-20312", directoryHasSingleGame: false, side: .back)
+        let backImage = try XCTUnwrap(back.flatMap(PS2CoverResolver.decodeImage))
+        XCTAssertGreaterThanOrEqual(backImage.width, 64)
+        let missingBack = await resolver.resolve(romURL: missingROM, serial: "SLUS-99999", directoryHasSingleGame: false, side: .back)
+        XCTAssertNil(missingBack)
     }
 
     // MARK: Helpers

@@ -24,6 +24,9 @@ else
   git checkout --quiet "$PLAY_COMMIT" && git submodule update --init --recursive --quiet
   git apply "$HERE/duo.patch"
 fi
+# Native WebAssembly exceptions instead of emscripten's JavaScript-based ones (much cheaper);
+# the flag lives in the Dependencies submodule, which duo.patch does not cover.
+sed -i.orig 's/ -fexceptions")/ -fwasm-exceptions")/' deps/Dependencies/cmake-modules/Header.cmake
 mkdir -p build_web && cd build_web
 [ -f build.ninja ] || emcmake cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DBUILD_PLAY=ON -DBUILD_PSFPLAYER=OFF -DUSE_QT=OFF
 ninja -j"${JOBS:-4}" Play

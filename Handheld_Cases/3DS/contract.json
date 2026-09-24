@@ -1,0 +1,92 @@
+{
+  "asset": "3DS-Case",
+  "description": "US (NTSC-U) Nintendo 3DS retail game case (CTR): white opaque PP keep case, landscape, clear outer film, book style (spine on the left seen from the front), 2 manual clips on the lid, one card holder in the tray centre, no GBA slot",
+  "root_node": "CTR_CASE",
+  "source": "Handheld_Cases/3DS/source/build_3ds_case.py",
+  "runtime_file": "DuoDS/Resources/3DS-Case.usdz",
+  "export_file": "Handheld_Cases/3DS/exports/3DS-Case.usdz",
+  "units": "file: metres (metersPerUnit 1, upAxis Y); every value in this JSON is mm unless the key says otherwise",
+  "frame": "case closed, standing, front cover +Z, spine -X; root CTR_CASE = bottom centre of the closed bbox",
+  "size_mm": {"width": 135.0, "height": 122.0, "thickness": 12.0},
+  "bbox_mm": {"x": [-67.5, 67.5], "y": [0.0, 122.0], "z": [-6.0, 6.0]},
+  "hinges_mm": {
+    "back": [-67.5, 61.0, -6.0],
+    "front": [-67.5, 61.0, 6.0],
+    "note": "hinge lines run along Y on the outer spine corners; CASE_SPINE_HINGE sits on the back line rotated pi about X; CASE_LID sits at local (0, 0, -12) under CASE_SPINE"
+  },
+  "motion_rad": {
+    "CASE_SPINE": {"channel": "rot_y", "closed": 0.0, "open": 1.5707963267948966},
+    "CASE_LID": {"channel": "rot_y", "closed": 0.0, "open": 1.5707963267948966},
+    "fully_open_mm": "tray | spine | lid flat, inner faces up, outer faces at z = -6, x -214.5 .. 67.5 (135 + 12 + 135)"
+  },
+  "insert_mm": {"back": 132.7, "spine": 12.0, "front": 131.3, "height": 116.1},
+  "u_splits": [0.480797101449, 0.524275362319],
+  "insert_placement_mm": {
+    "folds": "back|spine fold on the back/spine outer corner (x -67.5, z -6), spine|front fold on the front/spine outer corner (x -67.5, z +6)",
+    "back_free_edge_x": 65.2,
+    "front_free_edge_x": 63.8,
+    "y": [2.95, 119.05],
+    "v": "v = (y - 2.95) / 116.1, 0 = bottom, 1 = top"
+  },
+  "gametdb_coverfullHQ": {
+    "size_px": [1616, 680],
+    "splits_px": [777, 847],
+    "mm_per_px": 0.170792,
+    "note": "insert_mm = 276 mm x (777, 70, 769) / 1616 rounded to 0.1 mm; height 680 px = 116.14 mm -> 116.1. A full 1616 x 680 scan used as the texture as-is maps 1:1: fold error <= 0.23 px, aspect error 0.03 %"
+  },
+  "banner": "NOT modelled: the vertical white 'NINTENDO 3DS' strip (about 13-15 mm) at the far right of the FRONT panel is part of the paper insert and is drawn by the app into the texture (u about 0.948 .. 1.0)",
+  "medium_anchor": {
+    "node": "CASE_MEDIUM_ANCHOR",
+    "parent": "CASE_TRAY",
+    "position_mm": [-0.5, 60.0, -2.285],
+    "rotation_euler_rad": [0.0, 0.0, 0.0],
+    "axes": "+Z = card label-face normal (toward the lid), +Y = card up (label reads upright, contact edge at -Y), +X = key-tab side",
+    "origin": "centre of the 33 x 35 x 3.8 card body (key tab excluded); label face at anchor z +1.9, back face at -1.9",
+    "medium": {
+      "file": "DuoDS/Resources/Detailed-Cartridges.usdz",
+      "node": "threeDS",
+      "measured_local_bbox_mm": {"x": [-16.5, 17.5], "y": [-17.5, 17.5], "z": [-3.915, 0.043]},
+      "measured_notes": "body x -16.5..16.5; key tab x 16.5..17.5, y 11.2..14.8; label/front face z 0 (raised 3DS platform to +0.043); back face z -3.8 (molded marks to -3.915); contacts/PCB window at -Y",
+      "attach_to_anchor": {"position_m": [0.0, 0.0, 0.0019], "rotation_euler_rad": [0.0, 0.0, 0.0], "uniform_scale": 0.001}
+    }
+  },
+  "layout_mm": {
+    "wall": 1.2,
+    "plastic_outer_z": 5.55,
+    "tray_floor_z": -4.35,
+    "lid_floor_z": 4.35,
+    "split_gap": 0.05,
+    "card_holder": {
+      "center": [-0.5, 60.0],
+      "pocket_rel_anchor": {"x": [-17.0, 18.0], "y": [-18.0, 18.0]},
+      "rim": 3.0,
+      "rim_top_z": -1.6,
+      "release_tongue_rel_anchor": {"x": [18.2, 27.5], "y": [-5.5, 5.5], "top_z": -3.4},
+      "tongue_gap_y_rel_anchor": [-6.5, 6.5],
+      "hooks_rel_anchor": "right corners y +-(14.5..17.5), left nubs y +-(7..11); overhang 1.2 mm over the card, underside 0.085 mm above the label face"
+    },
+    "manual_clips": {
+      "centers_y": [32.0, 90.0],
+      "window_x": [36.0, 57.0],
+      "window_h": 11.0,
+      "note": "tongue from the free-edge side of each window toward the spine, raised head with a lip toward the spine"
+    },
+    "free_edge_rail_x": [60.8, 61.8],
+    "finger_recess": {"y": [39.0, 83.0], "z": [-2.6, 2.6], "depth": 0.8},
+    "spine_tabs_y": [[43.0, 47.0], [75.0, 79.0]],
+    "trademark_emboss": "tray: plain-text 'Nintendo 3DS' (Blender built-in font, NOT a traced logo), vertical, centre (44, 61), in TRADEMARK_PRINTS"
+  },
+  "colors": {
+    "case_plastic": "#EEEEEA",
+    "emboss": "#DCDCD6",
+    "cover_art_default": "#EDEDED",
+    "sleeve": "#FAFAFA @ alpha 0.04"
+  },
+  "triangle_budget": 40000,
+  "estimated_keys": [
+    "hinges_mm", "layout_mm.wall", "layout_mm.plastic_outer_z", "layout_mm.card_holder.rim_top_z",
+    "layout_mm.card_holder.release_tongue_rel_anchor", "layout_mm.card_holder.hooks_rel_anchor",
+    "layout_mm.manual_clips.note", "layout_mm.free_edge_rail_x", "layout_mm.finger_recess",
+    "layout_mm.spine_tabs_y", "medium_anchor.position_mm[2]", "colors"
+  ]
+}

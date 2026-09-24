@@ -31,6 +31,10 @@ final class PS2Feedback {
     /// Slot door: a short, quieter slice of the case-open latch pop; closing plays it reversed.
     private var doorOpenBuffer: AVAudioPCMBuffer?
     private var doorCloseBuffer: AVAudioPCMBuffer?
+    /// A disc / cartridge / UMD / memory card leaving or snapping back into its case holder: the
+    /// memory card click, lighter and higher for the release, crisper for the seat.
+    private var holderReleaseBuffer: AVAudioPCMBuffer?
+    private var holderSeatBuffer: AVAudioPCMBuffer?
     private var audioIsPrepared = false
     private var hapticEngine: CHHapticEngine?
     private let lightImpact = UIImpactFeedbackGenerator(style: .light)
@@ -53,6 +57,16 @@ final class PS2Feedback {
         memoryCardWithdrawBuffer = buffers[.memoryCardInsert].flatMap { Self.reversed($0) }
         doorOpenBuffer = buffers[.caseOpen].flatMap { Self.slice($0, from: 0.025, duration: 0.115, gain: 0.45) }
         doorCloseBuffer = doorOpenBuffer.flatMap { Self.reversed($0) }
+        // A bare click is much quieter than the case sounds (peaky, 0.1 s long), so both are
+        // normalised and softly saturated: release ≈ case close −1 dB, seat ≈ case close +1 dB.
+        holderReleaseBuffer = buffers[.memoryCardInsert]
+            .flatMap { Self.slice($0, from: 0.16, duration: 0.16, gain: 1) }
+            .flatMap { Self.resampled($0, speed: 1.35) }
+            .flatMap { Self.normalised($0, peak: 0.95, drive: 2.6) }
+        holderSeatBuffer = buffers[.memoryCardInsert]
+            .flatMap { Self.slice($0, from: 0.16, duration: 0.2, gain: 1) }
+            .flatMap { Self.resampled($0, speed: 1.12) }
+            .flatMap { Self.normalised($0, peak: 1.0, drive: 3.0) }
         // All approved clips are mono 44.1 kHz; connect with the first clip's format.
         let format = buffers.values.first?.format ?? AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
         for player in [clickPlayer, motorPlayer, doorPlayer] {
@@ -128,6 +142,18 @@ final class PS2Feedback {
         Self.log("disc-lift(reversed snap)")
     }
 
+    /// Medium unclipped from its case holder (disc off the hub, card out of its pocket, UMD out of the cradle).
+    func playHolderRelease() {
+        lightImpact.impactOccurred(intensity: 0.4)
+        play(holderReleaseBuffer, on: doorPlayer, name: "holder-release(memory card click, higher)")
+    }
+
+    /// Medium snapped back into its case holder.
+    func playHolderSeat() {
+        transient(intensity: 0.7, sharpness: 0.85)
+        play(holderSeatBuffer, on: doorPlayer, name: "holder-seat(memory card click)")
+    }
+
     /// Stops the tray motor (a pull released before the latch).
     func stopTray() { motorPlayer.stop() }
 
@@ -180,6 +206,40 @@ final class PS2Feedback {
         return output
     }
 
+    /// `source` scaled so its loudest sample is `peak`, through a tanh soft clipper with `drive`
+    /// (1 ≈ linear; higher = louder body, same peak).
+    private static func normalised(_ source: AVAudioPCMBuffer, peak: Float, drive: Float) -> AVAudioPCMBuffer? {
+        guard let data = source.floatChannelData else { return nil }
+        let channels = Int(source.format.channelCount), count = Int(source.frameLength)
+        var loudest: Float = 0
+        for channel in 0..<channels { for frame in 0..<count { loudest = max(loudest, abs(data[channel][frame])) } }
+        guard loudest > 0 else { return source }
+        let scale = peak / tanh(drive)
+        for channel in 0..<channels {
+            for frame in 0..<count { data[channel][frame] = scale * tanh(drive * data[channel][frame] / loudest) }
+        }
+        return source
+    }
+
+    /// `source` played `speed` times faster (pitch up), linear interpolation.
+    private static func resampled(_ source: AVAudioPCMBuffer, speed: Double) -> AVAudioPCMBuffer? {
+        guard let input = source.floatChannelData, speed > 0 else { return nil }
+        let count = Int(Double(source.frameLength) / speed)
+        guard count > 1, let output = AVAudioPCMBuffer(pcmFormat: source.format, frameCapacity: AVAudioFrameCount(count)),
+              let destination = output.floatChannelData else { return nil }
+        output.frameLength = AVAudioFrameCount(count)
+        let last = Int(source.frameLength) - 1
+        for channel in 0..<Int(source.format.channelCount) {
+            for frame in 0..<count {
+                let position = Double(frame) * speed
+                let i = min(Int(position), last), j = min(i + 1, last)
+                let t = Float(position - Double(i))
+                destination[channel][frame] = input[channel][i] * (1 - t) + input[channel][j] * t
+            }
+        }
+        return output
+    }
+
     /// A `duration`-second piece of `source` from `start`, scaled by `gain`, with 2 ms / 20 ms fades.
     private static func slice(_ source: AVAudioPCMBuffer, from start: Double, duration: Double,
                               gain: Float) -> AVAudioPCMBuffer? {
@@ -202,3 +262,23 @@ final class PS2Feedback {
         return output
     }
 }
+
+/// Plays the holder click when the pulled medium leaves its case holder or settles back into it
+/// (pull crossing a small threshold, with hysteresis). The first update only records the state,
+/// so a stage created mid-flight (e.g. on exit, pull 1) makes no sound.
+@MainActor
+struct CaseHolderClicks {
+    private var isOut: Bool?
+
+    mutating func update(pull: Float) {
+        guard let out = isOut else { isOut = pull > 0.05; return }
+        if !out, pull > 0.05 {
+            isOut = true
+            PS2Feedback.shared.playHolderRelease()
+        } else if out, pull < 0.012 {
+            isOut = false
+            PS2Feedback.shared.playHolderSeat()
+        }
+    }
+}
+

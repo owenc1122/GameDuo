@@ -11,6 +11,57 @@ index 6d91e5f..164fbcc 100644
  #else
  	return std::make_unique<Framework::CStdStream>(imagePathString.c_str(), Framework::GetInputStdStreamMode<fs::path::string_type>());
  #endif
+diff --git a/Source/FrameLimiter.cpp b/Source/FrameLimiter.cpp
+index 0d050fa..03c6d08 100644
+--- a/Source/FrameLimiter.cpp
++++ b/Source/FrameLimiter.cpp
+@@ -33,6 +33,28 @@ void CFrameLimiter::EndFrame()
+ {
+ 	assert(m_frameStarted);
+ 
++#ifdef __EMSCRIPTEN__
++	// Game Duo: pace against absolute deadlines. The averaged delay below lets every sleep's
++	// overshoot accumulate (about 2% slow in WebAssembly), which drops one 60 Hz display frame
++	// per second. Falling more than a few frames behind resyncs instead of fast-forwarding.
++	if(m_minFrameDuration.count() != 0)
++	{
++		auto currentTime = std::chrono::high_resolution_clock::now();
++		if(m_nextFrameTime == TimePoint() || (currentTime - m_nextFrameTime) > (m_minFrameDuration * 4))
++		{
++			m_nextFrameTime = currentTime;
++		}
++		m_nextFrameTime += m_minFrameDuration;
++		while(currentTime < m_nextFrameTime)
++		{
++			std::this_thread::sleep_for(std::chrono::microseconds(250));
++			currentTime = std::chrono::high_resolution_clock::now();
++		}
++	}
++	m_frameStarted = false;
++	return;
++#endif
++
+ 	//Add current frame time to array
+ 	{
+ 		auto currentFrameTime = std::chrono::high_resolution_clock::now();
+@@ -85,4 +107,5 @@ void CFrameLimiter::SetFrameRate(uint32 fps)
+ 	{
+ 		m_minFrameDuration = std::chrono::microseconds(1000000 / fps);
+ 	}
++	m_nextFrameTime = TimePoint();
+ }
+diff --git a/Source/FrameLimiter.h b/Source/FrameLimiter.h
+index 36e8b93..0ecbe4a 100644
+--- a/Source/FrameLimiter.h
++++ b/Source/FrameLimiter.h
+@@ -32,6 +32,7 @@ private:
+ 	std::chrono::microseconds m_minFrameDuration = std::chrono::microseconds(0);
+ 	bool m_frameStarted = false;
+ 	TimePoint m_lastFrameTime;
++	TimePoint m_nextFrameTime;
+ 
+ #ifdef _WIN32
+ 	HANDLE m_timer = 0;
 diff --git a/Source/ISO9660/DirectoryRecord.cpp b/Source/ISO9660/DirectoryRecord.cpp
 index 22faacc..7691b5a 100644
 --- a/Source/ISO9660/DirectoryRecord.cpp
@@ -225,6 +276,322 @@ index 0702672..0d66695 100644
  	uint64 m_position = 0;
 +	uint64 m_size = 0;
  };
+diff --git a/Source/PS2VM.cpp b/Source/PS2VM.cpp
+index 5c8ded9..2f6788c 100644
+--- a/Source/PS2VM.cpp
++++ b/Source/PS2VM.cpp
+@@ -778,13 +778,13 @@ void CPS2VM::UpdateSpu()
+ #endif
+ 
+ 	unsigned int blockOffset = (BLOCK_SIZE * m_currentSpuBlock);
+-	int16* samplesSpu0 = m_samples + blockOffset;
++	float* samplesSpu0 = m_samples + blockOffset;
+ 
+ 	m_iop->m_spuCore0.Render(samplesSpu0, BLOCK_SIZE);
+ 
+ 	if(m_iop->m_spuCore1.IsEnabled())
+ 	{
+-		int16 samplesSpu1[BLOCK_SIZE];
++		float samplesSpu1[BLOCK_SIZE];
+ 		m_iop->m_spuCore1.Render(samplesSpu1, BLOCK_SIZE);
+ 
+ 		for(unsigned int i = 0; i < BLOCK_SIZE; i++)
+@@ -793,7 +793,7 @@ void CPS2VM::UpdateSpu()
+ 			// corresponding to Core1's AVOL register values
+ 			int32 volume = (i % 2) ? m_iop->m_spuCore1.m_extInputVolR : m_iop->m_spuCore1.m_extInputVolL;
+ 			Iop::CSpuBase::MixSamples(samplesSpu0[i], volume, &samplesSpu1[i]);
+-			samplesSpu0[i] = samplesSpu1[i];
++			samplesSpu0[i] = std::clamp<float>(samplesSpu1[i], SHRT_MIN, SHRT_MAX);
+ 		}
+ 	}
+ 
+@@ -803,7 +803,7 @@ void CPS2VM::UpdateSpu()
+ 		if(m_soundHandler)
+ 		{
+ 			m_soundHandler->RecycleBuffers();
+-			m_soundHandler->Write(m_samples, BLOCK_SIZE * m_spuBlockCount, DST_SAMPLE_RATE);
++			m_soundHandler->WriteFloat(m_samples, BLOCK_SIZE * m_spuBlockCount, DST_SAMPLE_RATE);
+ 		}
+ 		m_currentSpuBlock = 0;
+ 	}
+diff --git a/Source/PS2VM.h b/Source/PS2VM.h
+index c4f8be0..e935997 100644
+--- a/Source/PS2VM.h
++++ b/Source/PS2VM.h
+@@ -182,14 +182,16 @@ private:
+ 	//SPU update parameters
+ 	enum
+ 	{
+-		DST_SAMPLE_RATE = 44100,
+-		SAMPLES_PER_UPDATE = 45, //44100 / 45 -> 980 SPU updates per second
++		//Game Duo: the SPU2's native 48 kHz, so streamed PCM (sound input) and voices are not
++		//resampled on the way out (the 48 -> 44.1 kHz input path picked nearest samples: grainy noise).
++		DST_SAMPLE_RATE = 48000,
++		SAMPLES_PER_UPDATE = 48, //48000 / 48 -> 1000 SPU updates per second
+ 		SPU_UPDATE_TICKS_PRECISION = 32,
+ 		BLOCK_SIZE = SAMPLES_PER_UPDATE * 2,
+ 		MAX_BLOCK_COUNT = 400,
+ 	};
+ 
+-	int16 m_samples[BLOCK_SIZE * MAX_BLOCK_COUNT];
++	float m_samples[BLOCK_SIZE * MAX_BLOCK_COUNT];
+ 	int m_currentSpuBlock = 0;
+ 	int m_spuBlockCount = 0;
+ 	CSoundHandler* m_soundHandler = nullptr;
+diff --git a/Source/gs/GSH_OpenGL/CMakeLists.txt b/Source/gs/GSH_OpenGL/CMakeLists.txt
+index 0f89436..6e6d013 100644
+--- a/Source/gs/GSH_OpenGL/CMakeLists.txt
++++ b/Source/gs/GSH_OpenGL/CMakeLists.txt
+@@ -18,6 +18,12 @@ if(NOT TARGET app_shared)
+ endif()
+ list(APPEND GSH_OPENGL_PROJECT_LIBS app_shared)
+ 
++#Game Duo: WebAssembly SIMD for the texture swizzling (NEON path) and vertex code. Only this
++#library: enabling it globally made the whole core slower in WebKit.
++if(EMSCRIPTEN)
++	list(APPEND GSH_OPENGL_COMPILE_OPTIONS -msimd128)
++endif()
++
+ if(TARGET_PLATFORM_UNIX_ARM)
+ 	list(APPEND GSH_OPENGL_COMPILE_OPTIONS "-mfpu=neon")
+ endif()
+diff --git a/Source/gs/GSH_OpenGL/GSH_OpenGL.cpp b/Source/gs/GSH_OpenGL/GSH_OpenGL.cpp
+index 7eb9460..5503a47 100644
+--- a/Source/gs/GSH_OpenGL/GSH_OpenGL.cpp
++++ b/Source/gs/GSH_OpenGL/GSH_OpenGL.cpp
+@@ -139,6 +139,14 @@ void CGSH_OpenGL::FlipImpl(const DISPLAY_INFO& dispInfo)
+ 	m_renderState.isValid = false;
+ 	m_validGlState = 0;
+ 
++	if(m_frameSkipDraw)
++	{
++		//Game Duo: nothing was drawn this frame; the page keeps showing the previous one.
++		UpdateFrameSkip();
++		CGSHandler::FlipImpl(dispInfo);
++		return;
++	}
++
+ 	const auto& dispLayer = dispInfo.layers[0];
+ 
+ 	FramebufferPtr framebuffer;
+@@ -241,9 +249,67 @@ void CGSH_OpenGL::FlipImpl(const DISPLAY_INFO& dispInfo)
+ 	}
+ 
+ 	PresentBackbuffer();
++	UpdateFrameSkip();
+ 	CGSHandler::FlipImpl(dispInfo);
+ }
+ 
++//Game Duo: when the GS cannot keep up with 60 frames per second, draw only every other frame
++//so the emulation, and with it the sound, stays at full speed. Slow frames are caught within
++//about 8 frames (a leaky count of frame intervals above 17.2 ms), before the audio buffer runs
++//dry. Drawing every frame is retried after a back-off (3 s, doubling up to 30 s on each failed
++//try), and only when the drawn frames took under 13.5 ms of GS time, so scenes right at the
++//limit never retry (each failed retry was an audible hitch); it counts as recovered after 5 s
++//at full speed. Only drawing is skipped: vertex queues, transfers and
++//registers are processed as usual.
++void CGSH_OpenGL::UpdateFrameSkip()
++{
++	auto now = std::chrono::steady_clock::now();
++	double interval = 16.7;
++	if(m_frameSkipLastFlip != std::chrono::steady_clock::time_point())
++	{
++		interval = std::chrono::duration<double, std::milli>(now - m_frameSkipLastFlip).count();
++	}
++	m_frameSkipLastFlip = now;
++	m_frameSkipInterval += (std::min(interval, 100.0) - m_frameSkipInterval) * 0.1;
++	//GS thread time of the frame that just ended; while skipping, the drawn frames tell whether
++	//drawing every frame would fit in 16.7 ms.
++	if(m_frameSkipActive && !m_frameSkipDraw)
++	{
++		m_frameSkipDrawnBusy += (std::min(m_threadBusyTime, 100.0) - m_frameSkipDrawnBusy) * 0.1;
++	}
++	m_threadBusyTime = 0;
++
++	if(!m_frameSkipActive)
++	{
++		if(interval > 17.2)
++			m_frameSkipSlowFrames += 1;
++		else if(m_frameSkipSlowFrames > 0)
++			m_frameSkipSlowFrames -= 1;
++		if(m_frameSkipSlowFrames >= 8)
++		{
++			if(m_frameSkipProbing) m_frameSkipBackoff = std::min(m_frameSkipBackoff * 2, 1800U);
++			m_frameSkipActive = true;
++			m_frameSkipProbing = false;
++			m_frameSkipStateFrames = 0;
++			printf("DUO_FRAMESKIP on (interval %.1f ms, retry in %u frames)\n", m_frameSkipInterval, m_frameSkipBackoff);
++		}
++		else if(m_frameSkipProbing && (++m_frameSkipStateFrames >= 300))
++		{
++			m_frameSkipProbing = false;
++			m_frameSkipBackoff = 180;
++			printf("DUO_FRAMESKIP off\n");
++		}
++	}
++	else if((++m_frameSkipStateFrames >= m_frameSkipBackoff) && (m_frameSkipDrawnBusy < 13.5))
++	{
++		m_frameSkipActive = false;
++		m_frameSkipProbing = true;
++		m_frameSkipStateFrames = 0;
++		m_frameSkipSlowFrames = 0;
++	}
++	m_frameSkipDraw = m_frameSkipActive && !m_frameSkipDraw;
++}
++
+ void CGSH_OpenGL::LoadState(Framework::CZipArchiveReader& archive)
+ {
+ 	CGSHandler::LoadState(archive);
+@@ -1991,7 +2057,7 @@ void CGSH_OpenGL::VertexKick(uint8 nRegister, uint64 nValue)
+ 	bool nDrawingKick = (nRegister == GS_REG_XYZ2) || (nRegister == GS_REG_XYZF2);
+ 	bool nFog = (nRegister == GS_REG_XYZF2) || (nRegister == GS_REG_XYZF3);
+ 
+-	if(!m_drawEnabled) nDrawingKick = false;
++	if(!m_drawEnabled || m_frameSkipDraw) nDrawingKick = false;
+ 
+ 	if(nFog)
+ 	{
+diff --git a/Source/gs/GSH_OpenGL/GSH_OpenGL.h b/Source/gs/GSH_OpenGL/GSH_OpenGL.h
+index 290deb7..d267e78 100644
+--- a/Source/gs/GSH_OpenGL/GSH_OpenGL.h
++++ b/Source/gs/GSH_OpenGL/GSH_OpenGL.h
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include <chrono>
+ #include <list>
+ #include <unordered_map>
+ #include "../GSHandler.h"
+@@ -320,6 +321,7 @@ private:
+ 
+ 	void ProcessPrim(uint64);
+ 	void VertexKick(uint8, uint64);
++	void UpdateFrameSkip();
+ 
+ 	Framework::OpenGl::ProgramPtr GetShaderFromCaps(const SHADERCAPS&);
+ 	Framework::OpenGl::ProgramPtr GenerateShader(const SHADERCAPS&);
+@@ -445,6 +447,17 @@ private:
+ 	unsigned int m_primitiveType;
+ 	bool m_drawingToDepth = false;
+ 
++	//Game Duo: adaptive frame skipping (UpdateFrameSkip)
++	bool m_frameSkipDraw = false;
++	bool m_frameSkipActive = false;
++	bool m_frameSkipProbing = false;
++	unsigned int m_frameSkipSlowFrames = 0;
++	unsigned int m_frameSkipStateFrames = 0;
++	unsigned int m_frameSkipBackoff = 180;
++	double m_frameSkipInterval = 16.7;
++	double m_frameSkipDrawnBusy = 16.7;
++	std::chrono::steady_clock::time_point m_frameSkipLastFlip;
++
+ 	static const GLenum g_nativeClampModes[CGSHandler::CLAMP_MODE_MAX];
+ 	static const unsigned int g_shaderClampModes[CGSHandler::CLAMP_MODE_MAX];
+ 	static const unsigned int g_alphaTestInverse[CGSHandler::ALPHA_TEST_MAX];
+diff --git a/Source/gs/GSHandler.cpp b/Source/gs/GSHandler.cpp
+index 57e58ba..9f23bb3 100644
+--- a/Source/gs/GSHandler.cpp
++++ b/Source/gs/GSHandler.cpp
+@@ -1,5 +1,6 @@
+ #include <stdio.h>
+ #include <string.h>
++#include <chrono>
+ #include <functional>
+ #include "AppConfig.h"
+ #include "Log.h"
+@@ -982,7 +983,26 @@ bool CGSHandler::TransferWriteHandlerGeneric(const void* pData, uint32 nLength)
+ 
+ 	auto pSrc = reinterpret_cast<const typename Storage::Unit*>(pData);
+ 
+-	for(unsigned int i = 0; i < nLength; i++)
++	//Game Duo: row runs through CPixelIndexor::WriteRow (per-pixel addressing was most of the GS
++	//thread's time in scenes that upload their textures every frame).
++	unsigned int i = 0;
++	while((i < nLength) && (m_trxCtx.nRRX < trxReg.nRRW))
++	{
++		uint32 run = std::min<uint32>(nLength - i, trxReg.nRRW - m_trxCtx.nRRX);
++		if(Indexor.WriteRow(m_trxCtx.nRRX + trxPos.nDSAX, m_trxCtx.nRRY + trxPos.nDSAY, pSrc + i, run))
++		{
++			nDirty = true;
++		}
++		i += run;
++		m_trxCtx.nRRX += run;
++		if(m_trxCtx.nRRX == trxReg.nRRW)
++		{
++			m_trxCtx.nRRX = 0;
++			m_trxCtx.nRRY++;
++		}
++	}
++
++	for(; i < nLength; i++)
+ 	{
+ 		uint32 nX = (m_trxCtx.nRRX + trxPos.nDSAX) % 2048;
+ 		uint32 nY = (m_trxCtx.nRRY + trxPos.nDSAY) % 2048;
+@@ -2176,10 +2196,12 @@ void CGSHandler::ThreadProc()
+ 	while(!m_threadDone)
+ 	{
+ 		m_mailBox.WaitForCall();
++		auto start = std::chrono::steady_clock::now();
+ 		while(m_mailBox.IsPending())
+ 		{
+ 			m_mailBox.ReceiveCall();
+ 		}
++		m_threadBusyTime += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+ 	}
+ }
+ 
+diff --git a/Source/gs/GSHandler.h b/Source/gs/GSHandler.h
+index 66bfe59..46e00fe 100644
+--- a/Source/gs/GSHandler.h
++++ b/Source/gs/GSHandler.h
+@@ -1133,6 +1133,8 @@ protected:
+ 	FrameDumpCallback m_frameDumpCallback;
+ 	bool m_regsDirty = false;
+ 	bool m_drawEnabled = true;
++	//Game Duo: GS thread time spent processing calls (ms), read and cleared by the renderer.
++	double m_threadBusyTime = 0;
+ 	CINTC* m_intc = nullptr;
+ 	bool m_gsThreaded = true;
+ 	bool m_flipped = false;
+diff --git a/Source/gs/GsPixelFormats.h b/Source/gs/GsPixelFormats.h
+index 4ab73c9..448c01f 100644
+--- a/Source/gs/GsPixelFormats.h
++++ b/Source/gs/GsPixelFormats.h
+@@ -332,6 +332,34 @@ public:
+ 			return reinterpret_cast<typename Storage::Unit*>(pixelAddr);
+ 		}
+ 
++		//Game Duo: stores a horizontal run of pixels (x wraps at 2048), one page segment at a time
++		//so the page number and row offsets are computed once per segment instead of per pixel.
++		//Same result as SetPixel on each pixel; returns whether any stored value changed.
++		bool WriteRow(unsigned int nX, unsigned int nY, const typename Storage::Unit* pSrc, unsigned int nCount)
++		{
++			bool dirty = false;
++			nY %= 2048;
++			uint32 rowPage = (nY / Storage::PAGEHEIGHT) * (m_nWidth * 64) / Storage::PAGEWIDTH;
++			const uint32* rowOffsets = m_pageOffsets[nY % Storage::PAGEHEIGHT];
++			while(nCount != 0)
++			{
++				nX %= 2048;
++				uint32 xInPage = nX % Storage::PAGEWIDTH;
++				uint32 span = std::min<uint32>(nCount, Storage::PAGEWIDTH - xInPage);
++				uint32 pageBase = m_nPointer + ((nX / Storage::PAGEWIDTH) + rowPage) * PAGESIZE;
++				for(uint32 i = 0; i < span; i++)
++				{
++					auto pixel = reinterpret_cast<typename Storage::Unit*>(m_pMemory + ((pageBase + rowOffsets[xInPage + i]) & (CGSHandler::RAMSIZE - 1)));
++					dirty |= (*pixel != pSrc[i]);
++					*pixel = pSrc[i];
++				}
++				pSrc += span;
++				nCount -= span;
++				nX += span;
++			}
++			return dirty;
++		}
++
+ 		static uint32* GetPageOffsets()
+ 		{
+ 			BuildPageOffsetTable();
 diff --git a/Source/iop/IopBios.cpp b/Source/iop/IopBios.cpp
 index e6b722a..7b03a83 100644
 --- a/Source/iop/IopBios.cpp
@@ -259,7 +626,7 @@ index e6b722a..7b03a83 100644
  }
  
 diff --git a/Source/iop/Iop_PadMan.cpp b/Source/iop/Iop_PadMan.cpp
-index 1431e95..2d55cdf 100644
+index 1431e95..d37f17c 100644
 --- a/Source/iop/Iop_PadMan.cpp
 +++ b/Source/iop/Iop_PadMan.cpp
 @@ -54,9 +54,42 @@ bool CPadMan::Invoke(uint32 method, uint32* args, uint32 argsSize, uint32* ret,
@@ -427,6 +794,22 @@ index 1431e95..2d55cdf 100644
  }
  
  void CPadMan::PDF_SetButtonState(CPadDataInterface* pPadData, CControllerInfo::BUTTON nButton, bool nPressed)
+@@ -312,6 +423,15 @@ void CPadMan::PDF_SetButtonState(CPadDataInterface* pPadData, CControllerInfo::B
+ 
+ 	pPadData->SetData(2, static_cast<uint8>(nStatus >> 8));
+ 	pPadData->SetData(3, static_cast<uint8>(nStatus >> 0));
++
++	//Game Duo: pressure bytes (right, left, up, down, triangle, circle, cross, square, L1, R1, L2, R2)
++	//as a DualShock 2 reports them. Left unwritten they stayed 0xFF, which pressure-aware games
++	//(TyraCraft) read as every button held down.
++	static const uint16 pressureMasks[12] = {0x2000, 0x8000, 0x1000, 0x4000, 0x0010, 0x0020, 0x0040, 0x0080, 0x0004, 0x0008, 0x0001, 0x0002};
++	for(unsigned int i = 0; i < 12; i++)
++	{
++		pPadData->SetData(8 + i, (nStatus & pressureMasks[i]) ? 0x00 : 0xFF);
++	}
+ }
+ 
+ void CPadMan::PDF_SetAxisState(CPadDataInterface* padData, CControllerInfo::BUTTON axis, uint8 axisValue)
 diff --git a/Source/iop/Iop_PadMan.h b/Source/iop/Iop_PadMan.h
 index 4fb63f8..2a0e5af 100644
 --- a/Source/iop/Iop_PadMan.h
@@ -503,6 +886,401 @@ index 4fb63f8..2a0e5af 100644
 +	{
 +	}
  }
+diff --git a/Source/iop/Iop_SpuBase.cpp b/Source/iop/Iop_SpuBase.cpp
+index 231400b..79c0f53 100644
+--- a/Source/iop/Iop_SpuBase.cpp
++++ b/Source/iop/Iop_SpuBase.cpp
+@@ -3,6 +3,7 @@
+ #include <cmath>
+ #include <climits>
+ #include <algorithm>
++#include <vector>
+ #include "string_format.h"
+ #include "Log.h"
+ #include "../states/RegisterStateCollectionFile.h"
+@@ -227,6 +228,7 @@ void CSpuBase::Reset()
+ 	}
+ 
+ 	m_blockReader.Reset();
++	m_inputReconstructor.Reset();
+ 	m_soundInputDataAddr = (m_spuNumber == 0) ? SOUND_INPUT_DATA_CORE0_BASE : SOUND_INPUT_DATA_CORE1_BASE;
+ 	m_blockWritePtr = 0;
+ }
+@@ -714,15 +716,22 @@ void CSpuBase::MixSamples(int32 inputSample, int32 volumeLevel, int16* output)
+ 	*output = static_cast<int16>(resultSample);
+ }
+ 
+-void CSpuBase::Render(int16* samples, unsigned int sampleCount)
++//Game Duo: float (16-bit scale) mixing, so volume scaling and summing keep full precision; the
++//result is clipped to the 16-bit range once, at the end.
++void CSpuBase::MixSamples(float inputSample, int32 volumeLevel, float* output)
++{
++	*output += inputSample * static_cast<float>(volumeLevel) / static_cast<float>(0x7FFF);
++}
++
++void CSpuBase::Render(float* samples, unsigned int sampleCount)
+ {
+ 	bool updateReverb = m_reverbEnabled && (m_ctrl & CONTROL_REVERB) && (m_reverbWorkAddrStart < m_reverbWorkAddrEnd);
+ 	bool irqEnabled = (m_ctrl & CONTROL_IRQ);
+ 
+-	int16* samplesBase = samples;
++	float* samplesBase = samples;
+ 	assert((sampleCount & 0x01) == 0);
+ 	unsigned int ticks = sampleCount / 2;
+-	memset(samples, 0, sizeof(int16) * sampleCount);
++	memset(samples, 0, sizeof(float) * sampleCount);
+ 
+ 	for(unsigned int j = 0; j < ticks; j++)
+ 	{
+@@ -767,14 +776,15 @@ void CSpuBase::Render(int16* samples, unsigned int sampleCount)
+ 
+ 			//Mix in adsrVolume
+ 			int32 inputSample = (readSample * static_cast<int32>(channel.adsrVolume >> 16)) / static_cast<int32>(MAX_ADSR_VOLUME >> 16);
++			float inputSampleF = static_cast<float>(readSample) * static_cast<float>(channel.adsrVolume >> 16) / static_cast<float>(MAX_ADSR_VOLUME >> 16);
+ 
+ 			if(inputSample == 0) continue;
+ 
+ 			int32 volumeLeft = channel.volumeLeftAbs >> 16;
+ 			int32 volumeRight = channel.volumeRightAbs >> 16;
+ 
+-			MixSamples(inputSample, volumeLeft, samples + 0);
+-			MixSamples(inputSample, volumeRight, samples + 1);
++			MixSamples(inputSampleF, volumeLeft, samples + 0);
++			MixSamples(inputSampleF, volumeRight, samples + 1);
+ 
+ 			//Mix in reverb if enabled for this channel
+ 			if(updateReverb && (m_channelReverb.f & (1 << i)))
+@@ -795,18 +805,19 @@ void CSpuBase::Render(int16* samples, unsigned int sampleCount)
+ 		{
+ 			int32 blockSamples[2] = {};
+ 			m_blockReader.GetSamples(blockSamples);
++			m_inputReconstructor.Process(blockSamples);
+ 
+ 			// Audio input data should have volume adjusted to BVOL register values . . .
+ 			if(m_spuNumber == 0 && m_blockReader.GetSpdifBypass())
+ 			{
+ 				//  . . . unless in bypass mode
+-				MixSamples(blockSamples[0], 0x7FFF, samples + 0);
+-				MixSamples(blockSamples[1], 0x7FFF, samples + 1);
++				MixSamples(static_cast<float>(blockSamples[0]), 0x7FFF, samples + 0);
++				MixSamples(static_cast<float>(blockSamples[1]), 0x7FFF, samples + 1);
+ 			}
+ 			else
+ 			{
+-				MixSamples(blockSamples[0], m_inputVolL, samples + 0);
+-				MixSamples(blockSamples[1], m_inputVolR, samples + 1);
++				MixSamples(static_cast<float>(blockSamples[0]), m_inputVolL, samples + 0);
++				MixSamples(static_cast<float>(blockSamples[1]), m_inputVolR, samples + 1);
+ 			}
+ 		}
+ 
+@@ -848,14 +859,9 @@ void CSpuBase::Render(int16* samples, unsigned int sampleCount)
+ 	}
+ 	m_irqWatcher->ClearIrqPending(m_spuNumber);
+ 
+-	if(m_volumeAdjust != 1.0f)
++	for(unsigned int i = 0; i < sampleCount; i++)
+ 	{
+-		for(int i = 0; i < sampleCount; i++)
+-		{
+-			float adjustedSample = static_cast<float>(samplesBase[i]) * m_volumeAdjust;
+-			adjustedSample = std::clamp<float>(adjustedSample, SHRT_MIN, SHRT_MAX);
+-			samplesBase[i] = static_cast<int16>(adjustedSample);
+-		}
++		samplesBase[i] = std::clamp<float>(samplesBase[i] * m_volumeAdjust, SHRT_MIN, SHRT_MAX);
+ 	}
+ }
+ 
+@@ -1007,7 +1013,7 @@ void CSpuBase::UpdateAdsr(CHANNEL& channel)
+ 	channel.adsrVolume = static_cast<uint32>(currentAdsrLevel);
+ }
+ 
+-void CSpuBase::UpdateReverb(int16 reverbSample[2], int16* samples)
++void CSpuBase::UpdateReverb(int16 reverbSample[2], float* samples)
+ {
+ 	//Feed samples to FIR filter
+ 	if(m_reverbTicks & 1)
+@@ -1112,21 +1118,8 @@ void CSpuBase::UpdateReverb(int16 reverbSample[2], int16* samples)
+ 		float sampleL = 0.333f * (GetReverbSample(GetReverbOffset(MIX_DEST_A0)) + GetReverbSample(GetReverbOffset(MIX_DEST_B0)));
+ 		float sampleR = 0.333f * (GetReverbSample(GetReverbOffset(MIX_DEST_A1)) + GetReverbSample(GetReverbOffset(MIX_DEST_B1)));
+ 
+-		{
+-			int16* output = samples + 0;
+-			int32 resultSample = static_cast<int32>(sampleL) + static_cast<int32>(*output);
+-			resultSample = std::max<int32>(resultSample, SHRT_MIN);
+-			resultSample = std::min<int32>(resultSample, SHRT_MAX);
+-			*output = static_cast<int16>(resultSample);
+-		}
+-
+-		{
+-			int16* output = samples + 1;
+-			int32 resultSample = static_cast<int32>(sampleR) + static_cast<int32>(*output);
+-			resultSample = std::max<int32>(resultSample, SHRT_MIN);
+-			resultSample = std::min<int32>(resultSample, SHRT_MAX);
+-			*output = static_cast<int16>(resultSample);
+-		}
++		samples[0] += sampleL;
++		samples[1] += sampleR;
+ 	}
+ 
+ 	m_reverbTicks++;
+@@ -1616,3 +1609,163 @@ void CSpuBase::CBlockSampleReader::UpdateSampleStep()
+ {
+ 	m_sampleStep = (m_baseSamplingRate * TIME_SCALE) / m_dstSamplingRate;
+ }
++
++/////////////////////////////////////////////
++// CInputReconstructor (Game Duo)
++/////////////////////////////////////////////
++
++void CSpuBase::CInputReconstructor::Reset()
++{
++	*this = CInputReconstructor();
++}
++
++void CSpuBase::CInputReconstructor::Process(int32 samples[2])
++{
++	uint64 n = m_sampleIndex++;
++	bool sameAsRun = m_hasRun && (samples[0] == m_runValue[0]) && (samples[1] == m_runValue[1]);
++	if(!sameAsRun)
++	{
++		if(m_hasRun) FinishRun(n);
++		m_hasRun = true;
++		m_runValue[0] = samples[0];
++		m_runValue[1] = samples[1];
++		m_runStart = n;
++	}
++
++	unsigned int oldest = (m_rawPos + 1) % (DELAY + 1);
++	m_raw[m_rawPos][0] = samples[0];
++	m_raw[m_rawPos][1] = samples[1];
++	m_rawPos = oldest;
++	samples[0] = m_raw[oldest][0];
++	samples[1] = m_raw[oldest][1];
++
++	if(!m_locked || (m_srcCount < SRC_POINTS)) return;
++
++	//Output time lags the input by DELAY. Find the source point k at or before it, then take
++	//TAPS_HALF points on each side (all of them must be known already).
++	double t = static_cast<double>(n) - DELAY;
++	uint64 newest = m_srcCount - 1;
++	double tNewest = m_srcTime[newest % SRC_POINTS];
++	if(t >= tNewest) return;
++	uint64 back = static_cast<uint64>(std::ceil((tNewest - t) / m_ratio));
++	if(back >= SRC_POINTS) return;
++	uint64 k = newest - back;
++	while((k < newest) && (m_srcTime[(k + 1) % SRC_POINTS] <= t)) k++;
++	while((k > m_srcCount - SRC_POINTS) && (m_srcTime[k % SRC_POINTS] > t)) k--;
++	if((k + TAPS_HALF > newest) || (k < m_srcCount - SRC_POINTS + TAPS_HALF - 1)) return;
++	double t1 = m_srcTime[k % SRC_POINTS];
++	double t2 = m_srcTime[(k + 1) % SRC_POINTS];
++	if((t2 <= t1) || (t < t1)) return;
++	double x = std::min(1.0, (t - t1) / (t2 - t1));
++	const float* weights = GetKernel() + static_cast<unsigned int>(x * (KERNEL_PHASES - 1) + 0.5) * (2 * TAPS_HALF);
++	double sum[2] = {};
++	for(int j = 0; j < 2 * TAPS_HALF; j++)
++	{
++		const int32* value = m_srcValue[(k - TAPS_HALF + 1 + j) % SRC_POINTS];
++		sum[0] += weights[j] * value[0];
++		sum[1] += weights[j] * value[1];
++	}
++	samples[0] = static_cast<int32>(std::clamp<double>(std::round(sum[0]), SHRT_MIN, SHRT_MAX));
++	samples[1] = static_cast<int32>(std::clamp<double>(std::round(sum[1]), SHRT_MIN, SHRT_MAX));
++}
++
++//Lanczos weights for each fractional position (phase) between two source points, normalised to 1.
++const float* CSpuBase::CInputReconstructor::GetKernel()
++{
++	static std::vector<float> kernel;
++	if(!kernel.empty()) return kernel.data();
++	std::vector<float> table(KERNEL_PHASES * 2 * TAPS_HALF);
++	auto sinc = [](double v) { return (std::abs(v) < 1e-9) ? 1.0 : std::sin(M_PI * v) / (M_PI * v); };
++	for(unsigned int phase = 0; phase < KERNEL_PHASES; phase++)
++	{
++		double x = static_cast<double>(phase) / (KERNEL_PHASES - 1);
++		double total = 0;
++		for(int j = 0; j < 2 * TAPS_HALF; j++)
++		{
++			double d = x - (j - (TAPS_HALF - 1));
++			double w = sinc(d) * sinc(d / TAPS_HALF);
++			table[phase * 2 * TAPS_HALF + j] = static_cast<float>(w);
++			total += w;
++		}
++		for(int j = 0; j < 2 * TAPS_HALF; j++) table[phase * 2 * TAPS_HALF + j] /= static_cast<float>(total);
++	}
++	kernel = std::move(table);
++	return kernel.data();
++}
++
++void CSpuBase::CInputReconstructor::FinishRun(uint64 end)
++{
++	uint32 length = static_cast<uint32>(end - m_runStart);
++	if(length <= MAX_STAT_RUN)
++	{
++		m_runLengths[m_runLengthCount % STAT_RUNS] = length;
++		m_runLengthCount++;
++		UpdateLock();
++	}
++	if(!m_locked)
++	{
++		m_nextTime = static_cast<double>(end);
++		return;
++	}
++	//A long run is several equal source samples in a row.
++	uint32 count = std::max<uint32>(1, static_cast<uint32>(std::lround(length / m_ratio)));
++	for(uint32 j = 0; j < count; j++)
++	{
++		//Sample-and-hold starts a source sample at ceil(its exact time): expect it half a sample early.
++		double observed = static_cast<double>(m_runStart) + (static_cast<double>(length) * j) / count - 0.5;
++		//Second-order loop: the phase follows slowly and the ratio settles on the stream's exact
++		//rate (a ratio re-estimated from recent runs wandered by ~0.1%, audible as pitch wobble).
++		double error = observed - m_nextTime;
++		if(std::abs(error) > 1.5)
++		{
++			m_nextTime = observed;
++		}
++		else
++		{
++			m_nextTime += 0.01 * error;
++			m_ratio += 0.00002 * error;
++		}
++		PushSource(m_nextTime, m_runValue);
++		m_nextTime += m_ratio;
++	}
++}
++
++void CSpuBase::CInputReconstructor::UpdateLock()
++{
++	if(m_runLengthCount < STAT_RUNS)
++	{
++		m_locked = false;
++		return;
++	}
++	//Held streams alternate between two adjacent run lengths (2 and 3 for 22.05 -> 48 kHz);
++	//longer runs are equal source samples in a row and are left out.
++	uint32 histogram[MAX_STAT_RUN + 2] = {};
++	for(uint32 length : m_runLengths) histogram[length]++;
++	uint32 bestLength = 0, bestCount = 0;
++	for(uint32 length = 1; length < MAX_STAT_RUN; length++)
++	{
++		uint32 count = histogram[length] + histogram[length + 1];
++		if(count > bestCount)
++		{
++			bestCount = count;
++			bestLength = length;
++		}
++	}
++	double mean = (bestCount == 0) ? 0 : static_cast<double>(bestLength * histogram[bestLength] + (bestLength + 1) * histogram[bestLength + 1]) / bestCount;
++	bool held = (bestCount * 5 >= STAT_RUNS * 4) && (mean >= 1.5) && (mean <= 8);
++	if(held && !m_locked)
++	{
++		m_srcCount = 0;
++		m_ratio = mean;
++	}
++	m_locked = held;
++}
++
++void CSpuBase::CInputReconstructor::PushSource(double time, const int32 value[2])
++{
++	unsigned int slot = m_srcCount % SRC_POINTS;
++	m_srcTime[slot] = time;
++	m_srcValue[slot][0] = value[0];
++	m_srcValue[slot][1] = value[1];
++	m_srcCount++;
++}
+diff --git a/Source/iop/Iop_SpuBase.h b/Source/iop/Iop_SpuBase.h
+index 1fab09e..2b48256 100644
+--- a/Source/iop/Iop_SpuBase.h
++++ b/Source/iop/Iop_SpuBase.h
+@@ -271,7 +271,7 @@ namespace Iop
+ 
+ 		uint32 ReceiveDma(uint8*, uint32, uint32, uint32);
+ 
+-		void Render(int16*, unsigned int);
++		void Render(float*, unsigned int);
+ 
+ 		static bool g_reverbParamIsAddress[REVERB_PARAM_COUNT];
+ 
+@@ -282,6 +282,7 @@ namespace Iop
+ 		int32 m_extInputVolR = 0x7FFF;
+ 
+ 		static void MixSamples(int32, int32, int16*);
++		static void MixSamples(float, int32, float*);
+ 
+ 	private:
+ 		enum
+@@ -359,6 +360,54 @@ namespace Iop
+ 			static_assert(CSampleReader::BUFFER_SAMPLES == CSpuSampleCache::BUFFER_SAMPLES, "Buffer sample size must match cache sample size.");
+ 		};
+ 
++		//Game Duo: undoes sample-and-hold upsampling in the sound input stream. Drivers such as
++		//ps2sdk's audsrv play 22.05 kHz (or other) PCM at 48 kHz by repeating samples, which adds
++		//broadband grain. When the stream's runs of repeated samples show a steady low source rate,
++		//the original samples are placed at their exact times (a small phase-locked loop) and
++		//re-interpolated with a 32-tap windowed sinc (Lanczos). Other input passes through,
++		//delayed by the same DELAY.
++		class CInputReconstructor
++		{
++		public:
++			void Reset();
++			void Process(int32 samples[2]);
++
++		private:
++			enum
++			{
++				DELAY = 48,
++				STAT_RUNS = 32,
++				SRC_POINTS = 128,
++				MAX_STAT_RUN = 16,
++				TAPS_HALF = 16,
++				KERNEL_PHASES = 1024,
++			};
++
++			static const float* GetKernel();
++
++			void FinishRun(uint64 end);
++			void UpdateLock();
++			void PushSource(double time, const int32 value[2]);
++
++			int32 m_raw[DELAY + 1][2] = {};
++			unsigned int m_rawPos = 0;
++			uint64 m_sampleIndex = 0;
++
++			bool m_hasRun = false;
++			int32 m_runValue[2] = {};
++			uint64 m_runStart = 0;
++
++			uint32 m_runLengths[STAT_RUNS] = {};
++			unsigned int m_runLengthCount = 0;
++			bool m_locked = false;
++			double m_ratio = 1;
++			double m_nextTime = 0;
++
++			double m_srcTime[SRC_POINTS] = {};
++			int32 m_srcValue[SRC_POINTS][2] = {};
++			uint64 m_srcCount = 0;
++		};
++
+ 		class CBlockSampleReader
+ 		{
+ 		public:
+@@ -390,7 +439,7 @@ namespace Iop
+ 		};
+ 
+ 		void UpdateAdsr(CHANNEL&);
+-		void UpdateReverb(int16[2], int16*);
++		void UpdateReverb(int16[2], float*);
+ 		uint32 GetAdsrDelta(unsigned int) const;
+ 		float GetReverbSample(uint32) const;
+ 		void SetReverbSample(uint32, float);
+@@ -429,6 +478,7 @@ namespace Iop
+ 		float m_volumeAdjust;
+ 
+ 		CBlockSampleReader m_blockReader;
++		CInputReconstructor m_inputReconstructor;
+ 		uint32 m_soundInputDataAddr = 0;
+ 		uint32 m_blockWritePtr = 0;
+ 
 diff --git a/Source/iop/ioman/OpticalMediaDirectoryIterator.cpp b/Source/iop/ioman/OpticalMediaDirectoryIterator.cpp
 index 083ffac..5a1d1da 100644
 --- a/Source/iop/ioman/OpticalMediaDirectoryIterator.cpp
@@ -533,8 +1311,41 @@ index 6d9534e..2d7abce 100644
  		};
  	}
  }
+diff --git a/Source/sound/SoundHandler.h b/Source/sound/SoundHandler.h
+index 88b2eba..aeb0c8a 100644
+--- a/Source/sound/SoundHandler.h
++++ b/Source/sound/SoundHandler.h
+@@ -1,6 +1,9 @@
+ #pragma once
+ 
++#include <algorithm>
++#include <cmath>
+ #include <functional>
++#include <vector>
+ #include "Types.h"
+ 
+ class CSoundHandler
+@@ -11,6 +14,18 @@ public:
+ 	virtual ~CSoundHandler() = default;
+ 	virtual void Reset() = 0;
+ 	virtual void Write(int16*, unsigned int, unsigned int) = 0;
++	//Game Duo: full-precision output (16-bit scale, not clipped to integers); the default
++	//rounds to 16 bits for handlers that only take integers.
++	virtual void WriteFloat(const float* samples, unsigned int sampleCount, unsigned int sampleRate)
++	{
++		std::vector<int16> converted(sampleCount);
++		for(unsigned int i = 0; i < sampleCount; i++)
++		{
++			float value = std::round(samples[i]);
++			converted[i] = static_cast<int16>(std::min(32767.f, std::max(-32768.f, value)));
++		}
++		Write(converted.data(), sampleCount, sampleRate);
++	}
+ 	virtual bool HasFreeBuffers() = 0;
+ 	virtual void RecycleBuffers() = 0;
+ 
 diff --git a/Source/ui_js/CMakeLists.txt b/Source/ui_js/CMakeLists.txt
-index cf3518e..49485ca 100644
+index cf3518e..c854db6 100644
 --- a/Source/ui_js/CMakeLists.txt
 +++ b/Source/ui_js/CMakeLists.txt
 @@ -43,8 +43,10 @@ list(APPEND UI_JS_PROJECT_LIBS sh_openal)
@@ -550,7 +1361,7 @@ index cf3518e..49485ca 100644
  	Main.cpp
  	Ps2VmJs.cpp
  	Ps2VmJs.h
-@@ -54,16 +56,15 @@ target_link_libraries(Play PUBLIC ${UI_JS_PROJECT_LIBS})
+@@ -54,16 +56,18 @@ target_link_libraries(Play PUBLIC ${UI_JS_PROJECT_LIBS})
  target_link_options(Play PRIVATE "--bind")
  target_link_options(Play PRIVATE "-sMODULARIZE=1")
  target_link_options(Play PRIVATE "-sEXPORT_ES6=1")
@@ -565,27 +1376,139 @@ index cf3518e..49485ca 100644
  target_link_options(Play PRIVATE "-sEXPORT_NAME=Play")
 -target_link_options(Play PRIVATE "-sPTHREAD_POOL_SIZE=2")
 -target_link_options(Play PRIVATE "-sWASM_BIGINT")
+-target_link_options(Play PRIVATE "-sOFFSCREEN_FRAMEBUFFER=1")
 +target_link_options(Play PRIVATE "-sPTHREAD_POOL_SIZE=6")
 +target_link_options(Play PRIVATE "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/duo_pre.js")
- target_link_options(Play PRIVATE "-sOFFSCREEN_FRAMEBUFFER=1")
++target_link_options(Play PRIVATE "-fwasm-exceptions")
++target_link_options(Play PRIVATE "-sMALLOC=mimalloc")
++target_link_options(Play PRIVATE "-sOFFSCREENCANVAS_SUPPORT=1")
++target_link_options(Play PRIVATE "-sOFFSCREENCANVASES_TO_PTHREAD=\"\"")
  target_link_options(Play PRIVATE "-sENVIRONMENT=web,worker")
  target_link_options(Play PRIVATE "-sUSE_WEBGL2=1")
 diff --git a/Source/ui_js/GSH_OpenGLJs.cpp b/Source/ui_js/GSH_OpenGLJs.cpp
-index 5c98e96..c58a679 100644
+index 5c98e96..73db2c8 100644
 --- a/Source/ui_js/GSH_OpenGLJs.cpp
 +++ b/Source/ui_js/GSH_OpenGLJs.cpp
-@@ -23,4 +23,5 @@ void CGSH_OpenGLJs::ReleaseImpl()
+@@ -1,17 +1,46 @@
+ #include "GSH_OpenGLJs.h"
++#include <cassert>
++#include <emscripten.h>
+ 
+-CGSH_OpenGLJs::CGSH_OpenGLJs(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context)
+-    : m_context(context)
++std::atomic<int> CGSH_OpenGLJs::m_outputWidth = 640;
++std::atomic<int> CGSH_OpenGLJs::m_outputHeight = 480;
++
++CGSH_OpenGL::FactoryFunction CGSH_OpenGLJs::GetFactoryFunction()
+ {
++	return []() { return new CGSH_OpenGLJs(); };
+ }
+ 
+-CGSH_OpenGL::FactoryFunction CGSH_OpenGLJs::GetFactoryFunction(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context)
++void CGSH_OpenGLJs::SetOutputSize(int width, int height)
+ {
+-	return [context]() { return new CGSH_OpenGLJs(context); };
++	m_outputWidth = width;
++	m_outputHeight = height;
+ }
+ 
+ void CGSH_OpenGLJs::InitializeImpl()
+ {
++	// Registered like a transferred canvas so emscripten_webgl_create_context finds it on this thread.
++	// The canvas (and its context) was created ahead of time by duoWarmWorkers (duo_pre.js).
++	EM_ASM({
++		var canvas = self.duoWarmCanvas || new OffscreenCanvas($0, $1);
++		canvas.width = $0;
++		canvas.height = $1;
++		var entry = {};
++		entry.canvas = canvas;
++		entry.canvasSharedPtr = _malloc(12);
++		entry.id = 'duoGS';
++		GL.offscreenCanvases['duoGS'] = entry;
++	}, m_outputWidth.load(), m_outputHeight.load());
++
++	EmscriptenWebGLContextAttributes attr;
++	emscripten_webgl_init_context_attributes(&attr);
++	attr.majorVersion = 2;
++	attr.minorVersion = 0;
++	attr.alpha = false;
++	attr.antialias = false;
++	attr.powerPreference = EM_WEBGL_POWER_PREFERENCE_HIGH_PERFORMANCE;
++	attr.proxyContextToMainThread = EMSCRIPTEN_WEBGL_CONTEXT_PROXY_DISALLOW;
++	m_context = emscripten_webgl_create_context("#duoGS", &attr);
++	assert(m_context > 0);
+ 	emscripten_webgl_make_context_current(m_context);
+ 	CGSH_OpenGL::InitializeImpl();
+ }
+@@ -19,8 +48,24 @@ void CGSH_OpenGLJs::InitializeImpl()
+ void CGSH_OpenGLJs::ReleaseImpl()
+ {
+ 	CGSH_OpenGL::ReleaseImpl();
++	emscripten_webgl_destroy_context(m_context);
++	m_context = 0;
+ }
  
  void CGSH_OpenGLJs::PresentBackbuffer()
  {
-+	emscripten_webgl_commit_frame();
++	// Hand the finished frame to the page (whole frames only, no tearing), then apply a pending
++	// resize so the next frame is drawn at the new size.
++	EM_ASM({
++		var canvas = GL.offscreenCanvases['duoGS'].canvas;
++		var frame = canvas.transferToImageBitmap();
++		var message = {};
++		message.duoFrame = frame;
++		postMessage(message, [frame]);
++		if(canvas.width != $0 || canvas.height != $1)
++		{
++			canvas.width = $0;
++			canvas.height = $1;
++		}
++	}, m_outputWidth.load(), m_outputHeight.load());
  }
+diff --git a/Source/ui_js/GSH_OpenGLJs.h b/Source/ui_js/GSH_OpenGLJs.h
+index 68eb2cc..3392b04 100644
+--- a/Source/ui_js/GSH_OpenGLJs.h
++++ b/Source/ui_js/GSH_OpenGLJs.h
+@@ -1,20 +1,30 @@
+ #pragma once
+ 
+-#include <emscripten/threading.h>
++#include <atomic>
++#include <emscripten/html5.h>
+ #include "gs/GSH_OpenGL/GSH_OpenGL.h"
+ 
++// Game Duo: the GS thread renders into its own OffscreenCanvas, so every WebGL call runs on that
++// thread instead of being proxied (often synchronously) to the page's main thread. Each finished
++// frame goes to the page as an ImageBitmap (see duo_pre.js).
+ class CGSH_OpenGLJs : public CGSH_OpenGL
+ {
+ public:
+-	CGSH_OpenGLJs(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE);
++	CGSH_OpenGLJs() = default;
+ 	virtual ~CGSH_OpenGLJs() = default;
+ 
+-	static FactoryFunction GetFactoryFunction(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE);
++	static FactoryFunction GetFactoryFunction();
++
++	// Output size in pixels; any thread. The canvas follows before the next frame is drawn.
++	static void SetOutputSize(int width, int height);
+ 
+ 	void InitializeImpl() override;
+ 	void ReleaseImpl() override;
+ 	void PresentBackbuffer() override;
+ 
+ private:
++	static std::atomic<int> m_outputWidth;
++	static std::atomic<int> m_outputHeight;
++
+ 	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE m_context = 0;
+ };
 diff --git a/Source/ui_js/InputProviderDuo.cpp b/Source/ui_js/InputProviderDuo.cpp
 new file mode 100644
-index 0000000..8834b1d
+index 0000000..b9f7680
 --- /dev/null
 +++ b/Source/ui_js/InputProviderDuo.cpp
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,55 @@
 +#include "InputProviderDuo.h"
 +#include <emscripten.h>
 +
@@ -618,10 +1541,11 @@ index 0000000..8834b1d
 +	const uint8 axes[4] = {lx, ly, rx, ry};
 +	for(uint32 i = 0; i < 4; i++)
 +	{
-+		if(axes[i] == m_axes[i]) continue;
++		if(m_axesSent && axes[i] == m_axes[i]) continue;
 +		m_axes[i] = axes[i];
 +		OnInput(MakeButtonTarget(static_cast<CControllerInfo::BUTTON>(CControllerInfo::ANALOG_LEFT_X + i)), axes[i]);
 +	}
++	m_axesSent = true;
 +	uint32 changed = buttons ^ m_buttons;
 +	m_buttons = buttons;
 +	for(uint32 i = CControllerInfo::DPAD_UP; i < CControllerInfo::MAX_BUTTONS; i++)
@@ -642,10 +1566,10 @@ index 0000000..8834b1d
 +}
 diff --git a/Source/ui_js/InputProviderDuo.h b/Source/ui_js/InputProviderDuo.h
 new file mode 100644
-index 0000000..04493df
+index 0000000..6b93962
 --- /dev/null
 +++ b/Source/ui_js/InputProviderDuo.h
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,29 @@
 +#pragma once
 +
 +#include "input/InputProvider.h"
@@ -670,17 +1594,20 @@ index 0000000..04493df
 +private:
 +	uint32 m_buttons = 0;
 +	uint8 m_axes[4] = {0x7F, 0x7F, 0x7F, 0x7F};
++	// The bindings start at 0, so the first call reports every axis even when it is neutral.
++	bool m_axesSent = false;
 +	uint8 m_largeMotor = 0;
 +	uint8 m_smallMotor = 0;
 +};
 diff --git a/Source/ui_js/Main.cpp b/Source/ui_js/Main.cpp
-index 999e24c..3b2e1ab 100644
+index 999e24c..7dbbce5 100644
 --- a/Source/ui_js/Main.cpp
 +++ b/Source/ui_js/Main.cpp
 @@ -1,18 +1,22 @@
 +// Game Duo entry points for the Play! web build. The host page (DuoDS/Resources/PS2Web) calls
 +// these through embind; the pad, disc and memory card all come from the iOS app.
  #include <cstdio>
++#include <emscripten.h>
  #include <emscripten/bind.h>
 +#include <emscripten/html5.h>
  #include "Ps2VmJs.h"
@@ -697,14 +1624,14 @@ index 999e24c..3b2e1ab 100644
  
  CPs2VmJs* g_virtualMachine = nullptr;
  CGSHandler::NewFrameEvent::Connection g_gsNewFrameConnection;
- EMSCRIPTEN_WEBGL_CONTEXT_HANDLE g_context = 0;
+-EMSCRIPTEN_WEBGL_CONTEXT_HANDLE g_context = 0;
 -std::shared_ptr<CInputProviderEmscripten> g_inputProvider;
 -CSH_OpenAL* g_soundHandler = nullptr;
 +std::shared_ptr<CInputProviderDuo> g_inputProvider;
  
  int main(int argc, const char** argv)
  {
-@@ -20,131 +24,141 @@ int main(int argc, const char** argv)
+@@ -20,131 +24,157 @@ int main(int argc, const char** argv)
  	return 0;
  }
  
@@ -725,8 +1652,9 @@ index 999e24c..3b2e1ab 100644
 -		break;
 -	}
 -	return true;
-+	// Resizes the canvas and emscripten's offscreen framebuffer together.
++	// The page's canvas shows the GS thread's frames; the GS canvas follows before the next frame.
 +	emscripten_set_canvas_element_size("#outputCanvas", width, height);
++	CGSH_OpenGLJs::SetOutputSize(width, height);
 +	if(!g_virtualMachine) return;
 +	CGSHandler::PRESENTATION_PARAMS presentationParams;
 +	presentationParams.mode = CGSHandler::PRESENTATION_MODE_FIT;
@@ -739,33 +1667,47 @@ index 999e24c..3b2e1ab 100644
 +// mcPath / hostPath are MEMFS directories the page fills before booting.
 +void duoInit(int width, int height, std::string mcPath, std::string hostPath)
  {
- 	EmscriptenWebGLContextAttributes attr;
- 	emscripten_webgl_init_context_attributes(&attr);
- 	attr.majorVersion = 2;
- 	attr.minorVersion = 0;
- 	attr.alpha = false;
-+	attr.antialias = false;
-+	attr.powerPreference = EM_WEBGL_POWER_PREFERENCE_HIGH_PERFORMANCE;
-+	// Frames reach the canvas only on emscripten_webgl_commit_frame() (GSH_OpenGLJs::PresentBackbuffer),
-+	// never half-drawn while the GS thread's proxied GL calls are still arriving.
-+	attr.explicitSwapControl = true;
+-	EmscriptenWebGLContextAttributes attr;
+-	emscripten_webgl_init_context_attributes(&attr);
+-	attr.majorVersion = 2;
+-	attr.minorVersion = 0;
+-	attr.alpha = false;
+-	g_context = emscripten_webgl_create_context("#outputCanvas", &attr);
+-	assert(g_context >= 0);
++	// Frames arrive from the GS thread's worker as ImageBitmaps (CGSH_OpenGLJs::PresentBackbuffer).
++	// Every pthread worker gets the listener, since any of them may end up running the GS thread.
++	EM_ASM({
++		var context = document.getElementById('outputCanvas').getContext('bitmaprenderer');
++		var onMessage = function(e) {
++			var frame = e.data && e.data.duoFrame;
++			if(!frame) return;
++			if(Module.duoPresentFrame)
++				Module.duoPresentFrame(frame);
++			else
++				context.transferFromImageBitmap(frame);
++		};
++		var attach = function(worker) {
++			if(worker.duoFrames) return;
++			worker.duoFrames = true;
++			worker.addEventListener('message', onMessage);
++		};
++		PThread.unusedWorkers.forEach(attach);
++		Object.values(PThread.pthreads).forEach(attach);
++		var allocate = PThread.allocateUnusedWorker;
++		PThread.allocateUnusedWorker = function() {
++			var worker = allocate.apply(PThread, arguments);
++			PThread.unusedWorkers.forEach(attach);
++			return worker;
++		};
++	});
 +	emscripten_set_canvas_element_size("#outputCanvas", width, height);
- 	g_context = emscripten_webgl_create_context("#outputCanvas", &attr);
- 	assert(g_context >= 0);
++	CGSH_OpenGLJs::SetOutputSize(width, height);
  
  	g_virtualMachine = new CPs2VmJs();
  	g_virtualMachine->Initialize();
-+	// After Initialize(): the VM registers these preferences with their defaults.
-+	auto& config = CAppConfig::GetInstance();
-+	config.SetPreferencePath(PREF_PS2_MC0_DIRECTORY, mcPath);
-+	config.SetPreferencePath(PREF_PS2_HOST_DIRECTORY, hostPath);
-+	// Small SPU blocks (22 x 45 frames ~ 22 ms) keep the audio ring evenly fed.
-+	config.SetPreferenceInteger(PREF_AUDIO_SPUBLOCKCOUNT, 22);
-+	g_virtualMachine->ReloadSpuBlockCount();
- 	g_virtualMachine->CreateGSHandler(CGSH_OpenGLJs::GetFactoryFunction(g_context));
-+	setPresentation(width, height);
- 
- 	{
+-	g_virtualMachine->CreateGSHandler(CGSH_OpenGLJs::GetFactoryFunction(g_context));
+-
+-	{
 -		//Size here needs to match the size of the canvas in HTML file.
 -
 -		CGSHandler::PRESENTATION_PARAMS presentationParams;
@@ -775,8 +1717,17 @@ index 999e24c..3b2e1ab 100644
 -
 -		g_virtualMachine->m_ee->m_gs->SetPresentationParams(presentationParams);
 -	}
--
--	{
++	// After Initialize(): the VM registers these preferences with their defaults.
++	auto& config = CAppConfig::GetInstance();
++	config.SetPreferencePath(PREF_PS2_MC0_DIRECTORY, mcPath);
++	config.SetPreferencePath(PREF_PS2_HOST_DIRECTORY, hostPath);
++	// Small SPU blocks (22 x 48 frames = 22 ms) keep the audio ring evenly fed.
++	config.SetPreferenceInteger(PREF_AUDIO_SPUBLOCKCOUNT, 22);
++	g_virtualMachine->ReloadSpuBlockCount();
++	g_virtualMachine->CreateGSHandler(CGSH_OpenGLJs::GetFactoryFunction());
++	setPresentation(width, height);
+ 
+ 	{
 +		using namespace PS2;
  		g_virtualMachine->CreatePadHandler(CPH_GenericInput::GetFactoryFunction());
  		auto padHandler = static_cast<CPH_GenericInput*>(g_virtualMachine->GetPadHandler());
@@ -962,14 +1913,15 @@ index 4484d5d..a229e4d 100644
  };
 diff --git a/Source/ui_js/SH_Duo.cpp b/Source/ui_js/SH_Duo.cpp
 new file mode 100644
-index 0000000..52f66b8
+index 0000000..fc9b0ae
 --- /dev/null
 +++ b/Source/ui_js/SH_Duo.cpp
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,52 @@
 +#include "SH_Duo.h"
 +#include <algorithm>
++#include <vector>
 +
-+static CSH_Duo::RING g_ring = {{0}, {0}, CSH_Duo::RING_FRAMES, 44100, {}};
++static CSH_Duo::RING g_ring = {{0}, {0}, CSH_Duo::RING_FRAMES, 48000, {}};
 +
 +CSoundHandler::FactoryFunction CSH_Duo::GetFactoryFunction()
 +{
@@ -987,6 +1939,12 @@ index 0000000..52f66b8
 +}
 +
 +void CSH_Duo::Write(int16* samples, unsigned int sampleCount, unsigned int sampleRate)
++{
++	std::vector<float> converted(samples, samples + sampleCount);
++	WriteFloat(converted.data(), sampleCount, sampleRate);
++}
++
++void CSH_Duo::WriteFloat(const float* samples, unsigned int sampleCount, unsigned int sampleRate)
 +{
 +	g_ring.sampleRate = sampleRate;
 +	uint32 frames = sampleCount / 2;
@@ -1013,10 +1971,10 @@ index 0000000..52f66b8
 +}
 diff --git a/Source/ui_js/SH_Duo.h b/Source/ui_js/SH_Duo.h
 new file mode 100644
-index 0000000..b9f73b4
+index 0000000..ded9b53
 --- /dev/null
 +++ b/Source/ui_js/SH_Duo.h
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,34 @@
 +#pragma once
 +
 +#include "sound/SoundHandler.h"
@@ -1030,7 +1988,7 @@ index 0000000..b9f73b4
 +public:
 +	enum
 +	{
-+		RING_FRAMES = 32768, // stereo frames, ~0.74 s at 44.1 kHz
++		RING_FRAMES = 32768, // stereo frames, ~0.68 s at 48 kHz
 +	};
 +
 +	struct RING
@@ -1039,7 +1997,7 @@ index 0000000..b9f73b4
 +		std::atomic<uint32> readFrames;  // total frames read by the worklet (wraps)
 +		uint32 capacity;
 +		uint32 sampleRate;
-+		int16 samples[RING_FRAMES * 2];
++		float samples[RING_FRAMES * 2]; // 16-bit scale, full precision (WriteFloat)
 +	};
 +
 +	static FactoryFunction GetFactoryFunction();
@@ -1047,15 +2005,16 @@ index 0000000..b9f73b4
 +
 +	void Reset() override;
 +	void Write(int16*, unsigned int, unsigned int) override;
++	void WriteFloat(const float*, unsigned int, unsigned int) override;
 +	bool HasFreeBuffers() override;
 +	void RecycleBuffers() override;
 +};
 diff --git a/Source/ui_js/duo_pre.js b/Source/ui_js/duo_pre.js
 new file mode 100644
-index 0000000..ca86ac0
+index 0000000..56e00d2
 --- /dev/null
 +++ b/Source/ui_js/duo_pre.js
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,119 @@
 +// Game Duo: runs in the page and in every pthread worker.
 +// WKWebView exposes shared memory but not the SharedArrayBuffer global; restore it.
 +if (typeof SharedArrayBuffer === 'undefined') {
@@ -1142,3 +2101,36 @@ index 0000000..ca86ac0
 +
 +// The wasm memory for the audio worklet (it reads the SH_Duo ring buffer directly).
 +Module.duoMemory = function () { return wasmMemory; };
++
++// The GS thread renders on an OffscreenCanvas in its own worker (GSH_OpenGLJs). WebKit creates
++// every worker WebGL context through the page's main run loop, and duoInit blocks the main thread
++// until the GS thread is initialised, so each pthread worker creates its canvas and context
++// beforehand (duoWarmWorkers() on the page); the GS thread then reuses its worker's pair.
++if (typeof WorkerGlobalScope !== 'undefined') {
++  self.addEventListener('message', (e) => {
++    if (!e.data || !e.data.duoWarmGL) return;
++    let ok = false;
++    try {
++      self.duoWarmCanvas = new OffscreenCanvas(640, 480);
++      // Same attributes as GSH_OpenGLJs asks for, so its getContext returns this context.
++      self.duoWarmContext = self.duoWarmCanvas.getContext('webgl2', {
++        alpha: false, depth: true, stencil: false, antialias: false, premultipliedAlpha: true,
++        preserveDrawingBuffer: false, powerPreference: 'high-performance',
++      });
++      ok = !!self.duoWarmContext;
++    } catch (err) {}
++    postMessage({ duoWarmed: ok });
++  });
++} else {
++  Module.duoWarmWorkers = function () {
++    return Promise.all(PThread.unusedWorkers.map((worker) => new Promise((resolve) => {
++      const onMessage = (e) => {
++        if (!e.data || e.data.duoWarmed === undefined) return;
++        worker.removeEventListener('message', onMessage);
++        resolve(e.data.duoWarmed);
++      };
++      worker.addEventListener('message', onMessage);
++      worker.postMessage({ duoWarmGL: true });
++    })));
++  };
++}

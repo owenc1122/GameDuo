@@ -23,3 +23,12 @@ tools/ps2_tests/.build*/
 !/ThirdParty/
 /ThirdParty/*
 !/ThirdParty/PlayWeb/
+!/Handheld_Cases/
+/Handheld_Cases/**/*.blend1
+tools/case_tests/.build*/
+# Retail box art scans and a vendor product photo: local reference only, not ours to redistribute
+/Handheld_Cases/cover_samples/*_full.png
+/Handheld_Cases/cover_samples/*_front_only.png
+/Handheld_Cases/cover_samples/*_front.png
+/Handheld_Cases/UMD/references/psp_case_open_mediaxpo.jpg
+/Handheld_Cases/UMD/references/psp_case_cradle_crop.png

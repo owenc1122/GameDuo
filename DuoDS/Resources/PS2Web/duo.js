@@ -90,18 +90,17 @@ let audio = null;
 let audioStats = null;
 let audioNode = null;
 
-// Plays the core's audio ring (SH_Duo) through an AudioWorklet at the SPU's 44.1 kHz.
+// Plays the core's audio ring (SH_Duo) through an AudioWorklet at the SPU2's native 48 kHz.
 async function startAudio() {
   try {
-    audio = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
+    audio = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
     await audio.audioWorklet.addModule('duo_audio.js');
     const node = new AudioWorkletNode(audio, 'duo-ps2-audio', { numberOfInputs: 0, outputChannelCount: [2] });
     node.port.postMessage({ memory: M.duoMemory(), ring: M.duoAudioRing(), samplesOffset: M.duoAudioRingSamplesOffset() });
     node.port.onmessage = (e) => {
       if (e.data.captured) {
-        const f = e.data.captured, pcm = new Int16Array(f.length);
-        for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(f[i] * 32767)));
-        post({ type: 'audioCapture', data: base64.encode(new Uint8Array(pcm.buffer)) });
+        // Float32 (-1...1), interleaved stereo at the context rate: keeps the full precision.
+        post({ type: 'audioCapture', data: base64.encode(new Uint8Array(e.data.captured.buffer)) });
       } else audioStats = e.data;
     };
     audioNode = node;
@@ -120,6 +119,109 @@ function suspendAudio() {
   if (audio && audio.state === 'running') audio.suspend().catch(() => {});
 }
 
+// The picture: the game's own black border (unused display rows/columns around many PS2 frames)
+// is cropped away, and the content is fitted into the picture rectangle (uniform scale, centred). A
+// clipping box (#pictureClip) hides the border and feathers the content's edges.
+let picture = null;       // rectangle from the app (CSS pixels)
+let content = null;       // where the frame's content is shown (CSS pixels)
+let crop = { top: 0, bottom: 0, left: 0, right: 0 }; // fractions of the frame
+const cropHistory = [];
+let cropProbe = null;
+let presentedFrames = 0;
+
+function layoutPicture() {
+  if (!picture) return;
+  const { x, y, width: w, height: h } = picture;
+  const ch = 1 - crop.top - crop.bottom, cw = 1 - crop.left - crop.right;
+  // Scale the frame so its content fits the picture rectangle (all of it stays visible); any
+  // space left over is covered by the blurred surround.
+  const k = Math.min(1 / cw, 1 / ch);
+  const canvasW = w * k, canvasH = h * k;
+  const contentW = canvasW * cw, contentH = canvasH * ch;
+  content = { x: x + (w - contentW) / 2, y: y + (h - contentH) / 2, width: contentW, height: contentH };
+  Object.assign(document.getElementById('pictureClip').style, {
+    left: `${content.x}px`, top: `${content.y}px`, width: `${content.width}px`, height: `${content.height}px`,
+  });
+  Object.assign(document.getElementById('outputCanvas').style, {
+    left: `${-canvasW * crop.left}px`, top: `${-canvasH * crop.top}px`, width: `${canvasW}px`, height: `${canvasH}px`,
+  });
+  document.documentElement.style.setProperty('--picture-bottom', `${y + h}px`);
+  window.duo.resize();
+}
+
+// Black border sizes from a 160x120 copy of the frame, twice a second. The smallest value per side
+// over the last ~5 s is used, so a dark scene is not mistaken for border.
+function measureBorder(frame) {
+  if (!cropProbe) {
+    const c = document.createElement('canvas');
+    c.width = 160; c.height = 120;
+    cropProbe = c.getContext('2d', { willReadFrequently: true });
+  }
+  cropProbe.drawImage(frame, 0, 0, 160, 120);
+  const d = cropProbe.getImageData(0, 0, 160, 120).data;
+  const lit = (x, y) => { const i = (y * 160 + x) * 4; return d[i] + d[i + 1] + d[i + 2] > 30; };
+  const rowLit = (y) => { for (let x = 0; x < 160; x += 2) if (lit(x, y)) return true; return false; };
+  const colLit = (x) => { for (let y = 0; y < 120; y += 2) if (lit(x, y)) return true; return false; };
+  let t = 0, b = 0, l = 0, r = 0;
+  while (t < 15 && !rowLit(t)) t++;
+  if (t === 15) return; // (nearly) black frame: tells nothing
+  while (b < 15 && !rowLit(119 - b)) b++;
+  while (l < 20 && !colLit(l)) l++;
+  while (r < 20 && !colLit(159 - r)) r++;
+  cropHistory.push({ top: t, bottom: b, left: l, right: r });
+  if (cropHistory.length > 10) cropHistory.shift();
+  const min = (k) => Math.min(...cropHistory.map((m) => m[k]));
+  // Half a probe pixel extra so no partly black row is left at the edge.
+  const next = {
+    top: min('top') ? (min('top') + 0.5) / 120 : 0, bottom: min('bottom') ? (min('bottom') + 0.5) / 120 : 0,
+    left: min('left') ? (min('left') + 0.5) / 160 : 0, right: min('right') ? (min('right') + 0.5) / 160 : 0,
+  };
+  if (['top', 'bottom', 'left', 'right'].some((k) => Math.abs(next[k] - crop[k]) > 0.002)) {
+    crop = next;
+    layoutPicture();
+  }
+}
+
+// The surround: every edge of the content continues outwards to the edge of the screen (a row or
+// column just inside it, stretched; the corners from the corner pixels), drawn small and blurred
+// by CSS, so the picture blends into a blurred extension of itself on all four sides. The canvas
+// reaches BLEED CSS pixels past the page so the blur does not fade at the borders.
+const SURROUND_SCALE = 0.25; // canvas pixels per CSS pixel
+const BLEED = 48;
+let surroundContext = null;
+
+function drawSurround(frame) {
+  if (++presentedFrames % 30 === 1) measureBorder(frame);
+  const canvas = document.getElementById('ambientCanvas');
+  const width = Math.ceil((window.innerWidth + 2 * BLEED) * SURROUND_SCALE);
+  const height = Math.ceil((window.innerHeight + 2 * BLEED) * SURROUND_SCALE);
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+    surroundContext = null;
+  }
+  const ctx = surroundContext || (surroundContext = canvas.getContext('2d'));
+  const rect = content || { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
+  const px = (rect.x + BLEED) * SURROUND_SCALE, py = (rect.y + BLEED) * SURROUND_SCALE;
+  const pw = rect.width * SURROUND_SCALE, ph = rect.height * SURROUND_SCALE;
+  const fw = frame.width, fh = frame.height;
+  const sx = fw * crop.left, sy = fh * crop.top;
+  const sw = fw * (1 - crop.left - crop.right), sh = fh * (1 - crop.top - crop.bottom);
+  const left = sx + sw * 0.01, top = sy + sh * 0.01;
+  const rightCol = sx + sw * 0.99 - 1, bottomRow = sy + sh * 0.99 - 1;
+  const right = px + pw, bottom = py + ph;
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(frame, sx, sy, sw, sh, px, py, pw, ph);
+  ctx.drawImage(frame, sx, top, sw, 1, px, 0, pw, py);                               // top
+  ctx.drawImage(frame, sx, bottomRow, sw, 1, px, bottom, pw, height - bottom);      // bottom
+  ctx.drawImage(frame, left, sy, 1, sh, 0, py, px, ph);                              // left
+  ctx.drawImage(frame, rightCol, sy, 1, sh, right, py, width - right, ph);          // right
+  ctx.drawImage(frame, left, top, 1, 1, 0, 0, px, py);                               // corners
+  ctx.drawImage(frame, rightCol, top, 1, 1, right, 0, width - right, py);
+  ctx.drawImage(frame, left, bottomRow, 1, 1, 0, bottom, px, height - bottom);
+  ctx.drawImage(frame, rightCol, bottomRow, 1, 1, right, bottom, width - right, height - bottom);
+}
+
 function canvasSize() {
   const canvas = document.getElementById('outputCanvas');
   const dpr = window.devicePixelRatio || 1;
@@ -135,6 +237,11 @@ window.duo = {
   pause() { paused = true; syncCard(); M?.duoPause(); suspendAudio(); },
   resume() { paused = false; M?.duoResume(); resumeAudio(); },
   syncCard() { return syncCard(); },
+  // The picture's rectangle (CSS pixels); the rest of the page shows the blurred surround.
+  setPicture(x, y, width, height) {
+    picture = { x, y, width, height };
+    layoutPicture();
+  },
   resize() {
     if (!M || !started) return;
     const { canvas, width, height } = canvasSize();
@@ -179,6 +286,13 @@ async function boot() {
     onAbort: (what) => post({ type: 'error', message: `abort: ${what}` }),
   });
   M.duoOnVibration = (large, small) => post({ type: 'rumble', large, small });
+  // Frames from the GS thread (CGSH_OpenGLJs::PresentBackbuffer) go to the picture canvas; a
+  // small copy of each also feeds the surround (drawSurround).
+  const pictureContext = document.getElementById('outputCanvas').getContext('bitmaprenderer');
+  M.duoPresentFrame = (frame) => {
+    drawSurround(frame);
+    pictureContext.transferFromImageBitmap(frame);
+  };
 
   M.FS.mkdirTree(MC);
   M.FS.mkdirTree(HOST);
@@ -190,9 +304,15 @@ async function boot() {
     await writeTree(M, HOST, host.map((path) => ({ path, url: `/host/${path.split('/').map(encodeURIComponent).join('/')}` })));
   }
 
+  const warmed = await M.duoWarmWorkers();
+  post({ type: 'log', message: `workers warmed ${warmed.filter(Boolean).length}/${warmed.length}` });
   const { width, height } = canvasSize();
   post({ type: 'log', message: `init canvas ${width}x${height} dpr=${window.devicePixelRatio}` });
   M.duoInit(width, height, MC, HOST);
+  // Play!'s axis bindings start at 0 (full up-left) and only change on an input event, so push
+  // one off-centre state and then neutral to centre all four axes before the game reads the pad.
+  M.duoSetPad(0, 0x80, 0x80, 0x80, 0x80);
+  M.duoSetPad(0, 0x7F, 0x7F, 0x7F, 0x7F);
   started = true;
   await startAudio();
   if (config.elf) M.duoBootElf(`${HOST}/${config.elf}`);

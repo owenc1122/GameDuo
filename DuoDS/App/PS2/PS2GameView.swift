@@ -757,8 +757,10 @@ final class PS2RuntimeModel: ObservableObject {
         let point = CGPoint(x: viewSize.width / 2, y: viewSize.height * 0.36)
         let local = SIMD3<Float>(Float(point.x - viewSize.width / 2) / f * depth,
                                  -Float(point.y - viewSize.height / 2) / f * depth, -depth)
-        // Disc +Y (label) → camera +Z, label top (disc −Z) → camera +Y, then a slight lean back.
-        let rotation = simd_quatf(angle: .pi / 2 - 0.2, axis: SIMD3(1, 0, 0))
+        // Disc +Y (label) → camera +Z, label top (disc −Z) → camera +Y: square to the camera, so
+        // the library's orthographic camera draws it identically at the hand-off (a lean made the
+        // perspective and orthographic outlines differ, a visible jump).
+        let rotation = simd_quatf(angle: .pi / 2, axis: SIMD3(1, 0, 0))
         return PS2Pose.compose(local, rotation, scale)
     }
 
@@ -815,6 +817,47 @@ final class PS2RuntimeModel: ObservableObject {
     private static func smooth(_ x: Double) -> Double {
         let t = min(max(x, 0), 1)
         return t * t * (3 - 2 * t)
+    }
+
+    // MARK: Entry (library → game in one shot)
+
+    /// The console's projected bounds in window coordinates (nil before the first layout).
+    var consoleWindowRect: CGRect? {
+        guard let view = consoleView, view.window != nil, consoleScreenRect.width > 1 else { return nil }
+        return view.convert(consoleScreenRect, to: nil)
+    }
+
+    /// Hides the console, the cable, the TV and the controller, and blacks out the backdrop,
+    /// while the library's camera move brings its own console here.
+    func beginEntry() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { foregroundHidden = true }
+        consoleNode?.isHidden = true
+        cableNode.isHidden = true
+        setEntryBackdrop(progress: 0)
+    }
+
+    /// Backdrop from black (0) to its normal colour (1).
+    func setEntryBackdrop(progress: CGFloat) {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        Self.backgroundColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let k = min(max(progress, 0), 1)
+        let color = UIColor(red: r * k, green: g * k, blue: b * k, alpha: 1)
+        consoleScene.background.contents = color
+        consoleScene.fogColor = color
+        renderRequest?(0.2)
+    }
+
+    func revealForeground() {
+        withAnimation(.easeInOut(duration: 0.6)) { foregroundHidden = false }
+    }
+
+    /// The library's console has arrived: the game's own console and cable take over.
+    func finishEntry() {
+        consoleNode?.isHidden = false
+        cableNode.isHidden = false
+        setEntryBackdrop(progress: 1)
     }
 
     /// Library pan: moves the camera up so everything at the console's depth slides down by
@@ -1161,25 +1204,37 @@ private struct PS2ScreenView: View {
     let core: PS2WebCore?
     let title: String
     let cover: CGImage?
+    /// The picture inside this (whole TV region) view. The core's page draws a blurred copy of
+    /// the picture around it, so the picture fades into its surroundings instead of ending at a
+    /// hard edge against the black.
+    let pictureRect: CGRect
 
     var body: some View {
         ZStack {
             Color.black
             if let core {
-                PS2CoreScreen(core: core, placeholder: { status in AnyView(placeholder(status: status)) })
+                PS2CoreScreen(core: core, pictureRect: pictureRect,
+                              placeholder: { status in AnyView(inPicture(placeholder(status: status))) })
             } else if let image = feed.image {
                 // PS2 output is stretched to the display aspect, like a TV.
-                Image(decorative: image, scale: 1)
+                inPicture(Image(decorative: image, scale: 1)
                     .resizable()
-                    .interpolation(.medium)
+                    .interpolation(.medium))
             } else {
-                placeholder(status: String(localized: "等待 PS2 内核"))
+                inPicture(placeholder(status: String(localized: "等待 PS2 内核")))
             }
         }
         .clipped()
         // Display only. `clipped()` does not clip hit-testing: the scaled-to-fill cover backdrop
         // would otherwise claim touches far below this frame, over the console's long-press.
         .allowsHitTesting(false)
+    }
+
+    private func inPicture(_ content: some View) -> some View {
+        content
+            .frame(width: pictureRect.width, height: pictureRect.height)
+            .clipped()
+            .position(x: pictureRect.midX, y: pictureRect.midY)
     }
 
     private func placeholder(status: String) -> some View {
@@ -1241,12 +1296,15 @@ private struct PS2ScreenView: View {
 /// status before that (or the error when the core stopped).
 private struct PS2CoreScreen: View {
     @ObservedObject var core: PS2WebCore
+    let pictureRect: CGRect
     let placeholder: (String) -> AnyView
 
     var body: some View {
         ZStack {
             PS2CoreWebView(webView: core.webView)
                 .opacity(core.hasFrame ? 1 : 0)
+                .onAppear { core.setPicture(pictureRect) }
+                .onChange(of: pictureRect) { _, rect in core.setPicture(rect) }
             if !core.hasFrame {
                 placeholder(status)
             } else if case .failed(let message) = core.state {
@@ -1358,10 +1416,12 @@ struct PS2GameView: View {
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
 
-                    PS2ScreenView(feed: model.screenFeed, core: model.core, title: title, cover: cover)
+                    PS2ScreenView(feed: model.screenFeed, core: model.core, title: title, cover: cover,
+                                  pictureRect: layout.screenRect.offsetBy(dx: -layout.screenRegion.minX,
+                                                                          dy: -layout.screenRegion.minY))
                         .ps2CRTShutdown(model.crt)
-                        .frame(width: layout.screenRect.width, height: layout.screenRect.height)
-                        .position(x: layout.screenRect.midX, y: layout.screenRect.midY)
+                        .frame(width: layout.screenRegion.width, height: layout.screenRegion.height)
+                        .position(x: layout.screenRegion.midX, y: layout.screenRegion.midY)
                         .opacity(model.foregroundHidden ? 0 : 1)
                         .accessibilityLabel(title)
 
@@ -1402,7 +1462,8 @@ struct PS2GameView: View {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-ps2-hittest-selftest") {
                 Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(1))
+                    // After the entry camera move (~1.4 s) has handed over to this screen.
+                    try? await Task.sleep(for: .seconds(3))
                     model.logConsoleHitTest(title: title)
                     try? await Task.sleep(for: .seconds(0.3))
                     onExitRequested()

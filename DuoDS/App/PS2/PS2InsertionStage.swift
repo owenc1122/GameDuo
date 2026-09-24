@@ -29,8 +29,19 @@ final class PS2InsertionStage {
 
     let caseStage: PS2CaseStage
     var target = PS2PullTarget.disc
+    private var holderClicks = CaseHolderClicks()
     /// Leaving a game: the disc travels from `start` (world) to its rest in the case.
     var discReturn: (start: simd_float4x4, progress: Float)?
+    /// Entering a game (one continuous camera move): the console blends from its resting pose
+    /// (progress 0) to `pose` (1), where it matches the game screen's console, and the case rises
+    /// out of view.
+    var entry: (pose: EntryPose, progress: Float)?
+
+    struct EntryPose {
+        var centre: SIMD3<Float>
+        var orientation: simd_quatf
+        var scale: Float
+    }
     private let consoleRoot = SCNNode()
     private let console: SCNNode?
     private let tray: SCNNode?
@@ -50,12 +61,15 @@ final class PS2InsertionStage {
 
     static let trayTravel: Float = 0.135
     private static let consoleTilt: Float = 0.62
+    /// The console's visual centre in its own units (the point the layout places).
+    private static let visualCentre = SIMD3<Float>(0, 0.039, 0.05)
     private static let green = UIColor(red: 0.235, green: 1, blue: 0.42, alpha: 1)   // #3CFF6B, as PS2GameView
     private static let red = UIColor(red: 1, green: 0.165, blue: 0.1, alpha: 1)      // #FF2A1A
     private static let blue = UIColor(red: 0.227, green: 0.482, blue: 1, alpha: 1)   // #3A7BFF
 
     init?(card: SCNNode, game: GameLibraryItem, parent: SCNNode) {
-        guard let caseStage = PS2CaseStage(card: card, game: game, parent: parent) else { return nil }
+        guard let caseStage = PS2CaseStage(card: card, game: game, parent: parent)
+                ?? PS2CaseStage(bareDiscCard: card, game: game, parent: parent) else { return nil }
         self.caseStage = caseStage
         let console = PS2StageAssets.console?.clone()
         self.console = console
@@ -81,6 +95,47 @@ final class PS2InsertionStage {
         setPowerLight(.standby)
     }
 
+    /// The pose that puts the console's body on `rect` (view points) as the game screen shows it:
+    /// seen from 13° above and 16° to the left, like PS2RuntimeModel's camera.
+    func entryPose(fitting rect: CGRect, in view: SCNView, unitsPerPoint: Float) -> EntryPose? {
+        guard let body = console?.childNode(withName: "BODY", recursively: true) else { return nil }
+        let saved = (consoleRoot.simdPosition, consoleRoot.simdOrientation, consoleRoot.simdScale)
+        defer {
+            consoleRoot.simdPosition = saved.0
+            consoleRoot.simdOrientation = saved.1
+            consoleRoot.simdScale = saved.2
+        }
+        let orientation = simd_quatf(angle: 13 * .pi / 180, axis: SIMD3(1, 0, 0))
+            * simd_quatf(angle: 16 * .pi / 180, axis: SIMD3(0, 1, 0))
+        var scale = saved.2.x
+        var centre = saved.0 + saved.1.act(Self.visualCentre) * scale
+        func apply() {
+            consoleRoot.simdOrientation = orientation
+            consoleRoot.simdScale = SIMD3(repeating: scale)
+            consoleRoot.simdPosition = centre - orientation.act(Self.visualCentre) * scale
+        }
+        func projected() -> CGRect {
+            let (a, b) = body.boundingBox
+            var r = CGRect.null
+            for x in [a.x, b.x] { for y in [a.y, b.y] { for z in [a.z, b.z] {
+                let p = view.projectPoint(SCNVector3(body.simdConvertPosition(SIMD3(x, y, z), to: nil)))
+                r = r.union(CGRect(x: CGFloat(p.x), y: CGFloat(p.y), width: 0, height: 0))
+            } } }
+            return r
+        }
+        for _ in 0..<3 {
+            apply()
+            let r = projected()
+            guard !r.isNull, r.width > 1 else { return nil }
+            scale *= Float(rect.width / r.width)
+            apply()
+            let moved = projected()
+            centre.x += Float(rect.midX - moved.midX) * unitsPerPoint
+            centre.y -= Float(rect.midY - moved.midY) * unitsPerPoint
+        }
+        return EntryPose(centre: centre, orientation: orientation, scale: scale)
+    }
+
     func remove() {
         blinkTask?.cancel()
         caseStage.remove()
@@ -98,11 +153,14 @@ final class PS2InsertionStage {
         }
         func mix(_ a: Float, _ b: Float, _ t: Float) -> Float { a + (b - a) * t }
         let caseUnits = CartridgeSceneFactory.ps2CaseUnitsPerMetre
+        if !caseStage.isBare { holderClicks.update(pull: f.pull) }
         let approach = min(f.pull / 0.68, 1)
         let entry = max(0, (f.pull - 0.68) / 0.32)
         let lift = smooth(0, 1, approach)
 
         // Case: hinges, then the book-like open pose facing the camera, fitted to the width.
+        // (Bare-disc mode: the card keeps its Cover Flow pose; only its disc travels.)
+        if !caseStage.isBare {
         let spine = smooth(0, 0.62, f.open)
         let lidOpen = smooth(0.3, 1, f.open)
         caseStage.setHinges(spine: spine, lid: lidOpen)
@@ -123,11 +181,12 @@ final class PS2InsertionStage {
         card.eulerAngles = SCNVector3(-0.10 * swing, 0.28 * swing, 0)
         card.opacity = 1
         card.isHidden = false
+        }
 
         // Console: rises from below like the PSP, tilted so the tray and top face the camera.
         let consoleUnits = min(f.width * 0.88 / 0.301, f.fullHeight * 0.40 / 0.25)
         let orientation = simd_quatf(angle: Self.consoleTilt, axis: SIMD3(1, 0, 0))
-        let visualCentre = SIMD3<Float>(0, 0.039, 0.05)
+        let visualCentre = Self.visualCentre
         let restingY = f.cameraY - f.fullHeight * 0.5 + 0.25 * consoleUnits * 0.5 + f.fullHeight * 0.06
         let hiddenY = f.cameraY - f.fullHeight * 0.5 - 0.22 * consoleUnits
         let centre = SIMD3<Float>(0, mix(hiddenY, restingY, approach), 0.3)
@@ -135,6 +194,20 @@ final class PS2InsertionStage {
         consoleRoot.simdOrientation = orientation
         consoleRoot.simdScale = SIMD3(repeating: consoleUnits)
         consoleRoot.simdPosition = centre - orientation.act(visualCentre) * consoleUnits
+        if let move = self.entry {
+            // One continuous move: the console turns to the game camera's angle and shrinks onto
+            // its spot between the TV and the controller while the case lifts away.
+            let t = move.progress // already eased by the animation curve
+            let movedCentre = centre + (move.pose.centre - centre) * t
+            let turned = simd_slerp(orientation, move.pose.orientation, t)
+            let scale = mix(consoleUnits, move.pose.scale, t)
+            consoleRoot.simdOrientation = turned
+            consoleRoot.simdScale = SIMD3(repeating: scale)
+            consoleRoot.simdPosition = movedCentre - turned.act(visualCentre) * scale
+            let away = caseStage.isBare ? 0 : smooth(0, 0.75, move.progress)
+            card.simdPosition.y += away * f.fullHeight * 0.85
+            card.opacity = CGFloat(1 - away)
+        }
         let trayTravel = f.tray ?? (target == .disc ? smooth(0.08, 0.7, f.pull) : 0)
         if f.tray == nil, target == .disc {
             // The motor starts as soon as the tray begins to follow the disc.
@@ -328,7 +401,8 @@ extension DragCartridgeSceneView.Coordinator {
     }
 
     func openPS2Case(completion: (() -> Void)? = nil) {
-        guard mode == .idle, let game = selectedPS2Game, cards.indices.contains(selection) else { return }
+        guard mode == .idle, let game = selectedPS2Game, cards.indices.contains(selection),
+              !CartridgeSceneFactory.isBarePS2Disc(cards[selection]) else { return }
         if ps2 == nil {
             ps2 = PS2InsertionStage(card: cards[selection], game: game, parent: scene.rootNode)
         }
@@ -380,6 +454,13 @@ extension DragCartridgeSceneView.Coordinator {
     /// Vertical drag in the PS2 branch. On a closed case it opens it; on an open case it starts
     /// pulling the disc or memory card under the finger. True when a pull started.
     func beginPS2Pull(from point: CGPoint, in view: SCNView) -> Bool {
+        if mode == .idle, beginBarePS2Stage(), let ps2 {
+            // Bare disc: straight into the pull, no case to open.
+            ps2.target = .disc
+            PS2Feedback.shared.prepare()
+            mode = .pull
+            return true
+        }
         if mode == .idle { openPS2Case(); return false }
         guard mode == .caseOpen, let ps2, let target = ps2.caseStage.pullTarget(at: point, in: view) else { return false }
         ps2.target = target
@@ -411,7 +492,7 @@ extension DragCartridgeSceneView.Coordinator {
                     guard self.mode == .opening else { return }
                     self.mode = .finished
                     self.owner.onInserted(game)
-                    self.owner.onFinished()
+                    self.enterPS2Game(stage: ps2)
                 }
             })
         case .memoryCard:
@@ -494,6 +575,63 @@ extension DragCartridgeSceneView.Coordinator {
         })
     }
 
+    /// Into the game in one shot: the game screen is set up underneath (console, TV and controller
+    /// hidden), the library turns transparent over it, and the console turns and shrinks onto the
+    /// game screen's console while the case lifts away and the TV and controller fade in. Then
+    /// the game's own console takes over in the same frame.
+    private func enterPS2Game(stage ps2: PS2InsertionStage) {
+        guard !reduceMotion, let view else { owner.onFinished(); return }
+        var attempts = 0
+        func begin() {
+            // The game screen needs a layout pass before its console rect is known.
+            guard let model = PS2RuntimeModel.active, let rect = model.consoleWindowRect, rect.width > 1 else {
+                attempts += 1
+                if attempts < 90 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0 / 60, execute: begin)
+                } else {
+                    owner.onFinished()
+                }
+                return
+            }
+            let unitsPerPoint = fullHeight / Float(max(1, view.bounds.height))
+            guard let pose = ps2.entryPose(fitting: view.convert(rect, from: nil), in: view, unitsPerPoint: unitsPerPoint) else {
+                owner.onFinished()
+                return
+            }
+            model.beginEntry()
+            // One frame for the hidden game state to render before the library turns transparent.
+            DispatchQueue.main.async {
+                view.backgroundColor = .clear
+                view.isOpaque = false
+                ps2.entry = (pose, 0)
+                self.layout()
+                var revealed = false
+                self.animate(duration: 1.4, update: { t in
+                    ps2.entry = (pose, t)
+                    model.setEntryBackdrop(progress: CGFloat(t))
+                    if t > 0.45, !revealed {
+                        revealed = true
+                        model.revealForeground()
+                    }
+                    self.layout()
+                }, completion: {
+                    model.finishEntry()
+                    DispatchQueue.main.async {
+                        self.owner.onFinished()
+                        // Opaque again once the library has faded out over the game.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            ps2.entry = nil
+                            view.backgroundColor = .black
+                            view.isOpaque = true
+                            self.layout()
+                        }
+                    }
+                })
+            }
+        }
+        begin()
+    }
+
     /// The camera pans up by one screen height with the disc, which starts exactly where the game
     /// screen showed it and settles on the case's disc anchor; the game view pans in step below.
     private func panPS2Exit(handoff: PS2ExitHandoff, pose: PS2ExitDiscPose, stage ps2: PS2InsertionStage, in view: SCNView) {
@@ -530,8 +668,11 @@ extension DragCartridgeSceneView.Coordinator {
             self.animate(duration: 1.05, update: { t in
                 self.cameraNode.position.y = baseY - drop * (1 - t)
                 handoff.model.setExitPan(points: points * CGFloat(t), fade: CGFloat(t))
-                // The disc leads and the view follows it up, catching up as it settles.
-                ps2.discReturn = (start, self.smoothstep(0, 0.82, t))
+                // The disc's start moves with the camera, so on screen it holds still and then
+                // travels straight up into the case (a world-fixed start slid down with the pan
+                // first: down, up, down instead of one move).
+                let following = simd_float4x4(translation: SIMD3(0, drop * t, 0)) * start
+                ps2.discReturn = (following, self.smoothstep(0, 0.82, t))
                 self.layout()
             }, completion: {
                 self.cameraNode.position.y = baseY
@@ -593,7 +734,11 @@ extension DragCartridgeSceneView.Coordinator {
                     completion: { self.snapIntoLatch() })
         }
         switch mode {
-        case .idle: openPS2Case(completion: pull); return true
+        case .idle:
+            if target == .disc, beginBarePS2Stage() { pull(); return true }
+            if cards.indices.contains(selection), CartridgeSceneFactory.isBarePS2Disc(cards[selection]) { return false }
+            openPS2Case(completion: pull)
+            return true
         case .caseOpen: pull(); return true
         default: return false
         }

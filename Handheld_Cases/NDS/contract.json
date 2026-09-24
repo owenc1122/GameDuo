@@ -1,0 +1,157 @@
+{
+  "asset": "NDS-Case",
+  "description": "US (NTSC-U) Nintendo DS retail game case, opaque dark grey PP, clear outer film, book style (spine on -X), LANDSCAPE",
+  "root_node": "NDS_CASE",
+  "runtime_file": "DuoDS/Resources/NDS-Case.usdz",
+  "units": "metres in the USDZ (metersPerUnit 1, upAxis Y); mm in this file",
+  "frame": "case closed, standing, front cover +Z, spine -X; root = bbox bottom centre",
+  "size_mm": [
+    135.0,
+    122.0,
+    14.5
+  ],
+  "bbox_mm": {
+    "x": [
+      -67.5,
+      67.5
+    ],
+    "y": [
+      0.0,
+      122.0
+    ],
+    "z": [
+      -7.25,
+      7.25
+    ]
+  },
+  "hinges": {
+    "back_hinge_line_mm": [
+      -67.5,
+      61.0,
+      -7.25
+    ],
+    "front_hinge_line_mm": [
+      -67.5,
+      61.0,
+      7.25
+    ],
+    "CASE_SPINE_HINGE": "at the back hinge line, rotation (pi, 0, 0): local +Y = world -Y",
+    "CASE_SPINE": "identity rest; local rot_y 0 (closed) -> pi/2",
+    "CASE_LID": "local position (0, 0, -14.5 mm) in CASE_SPINE, zero rest rotation; local rot_y 0 -> pi/2",
+    "fully_open": "tray | spine | lid flat, inner faces +Z, outer faces z = -7.25, x -217.0 .. 67.5 mm"
+  },
+  "insert_mm": {
+    "back": 130.0,
+    "spine": 15.7,
+    "front": 130.0,
+    "height": 116.0
+  },
+  "u_splits": [
+    0.471527,
+    0.528473
+  ],
+  "insert_uv": {
+    "layout": "back | spine | front as seen from outside, u 0 = back free edge, u 1 = front free edge, v 0 = bottom, v 1 = top",
+    "insert_y_on_case_mm": [
+      3.0,
+      119.0
+    ],
+    "front_fold_x_mm": -66.0,
+    "paper_free_edge_x_mm": 64.0,
+    "gametdb_coverfullHQ": "1616 x 680 px maps 1:1 (5.862 px/mm): folds at 762.0 / 854.0 px (measured 764 / 856 +-3)",
+    "mesh_u_coverage": "back 0 .. 0.4753, spine 0.4761 .. 0.5239, front 0.5247 .. 1"
+  },
+  "medium": {
+    "model": "DuoDS/Resources/Detailed-Cartridges.usdz /root/ndsStandard (mm units)",
+    "card_local_bbox_mm": {
+      "min": [
+        -16.5,
+        -17.5,
+        -3.915
+      ],
+      "max": [
+        16.501,
+        17.5,
+        0.043
+      ]
+    },
+    "card_axes": "+Z = label face normal (label plane at Z 0), +Y = up, contacts at -Y",
+    "CASE_MEDIUM_ANCHOR_mm": [
+      -10.5,
+      45.0,
+      -3.485
+    ],
+    "anchor_rotation": "identity: +Z toward the lid (label normal), +Y card up, +X right",
+    "placement": "ndsStandard as child of CASE_MEDIUM_ANCHOR: position (0, 0, +1.9 mm) (card origin = label plane, 1.9 mm above the body centre), rotation identity, uniform scale 0.001 (mm -> m)",
+    "card_locating_rect_mm": {
+      "x": [
+        -27.3,
+        6.3
+      ],
+      "y": [
+        27.2,
+        62.8
+      ],
+      "size": [
+        33.6,
+        35.6
+      ],
+      "note": "card + 0.3 per side: X by the 4 clip posts, Y by the frame walls"
+    },
+    "holder_inner_wall_to_wall_mm": [
+      38.0,
+      35.6
+    ],
+    "holder_outer_mm": [
+      47.0,
+      46.0
+    ],
+    "holder_center_mm": [
+      -10.5,
+      45.0
+    ],
+    "holder_top_z_mm": -0.6,
+    "card_underside_above_floor_mm": 0.1,
+    "tray_floor_z_mm": -5.6
+  },
+  "gba_bracket_mm": {
+    "x": [
+      -38.0,
+      18.7
+    ],
+    "y": [
+      83.8,
+      105.6
+    ],
+    "inner_width": 53.9
+  },
+  "manual_clips_straight_edge_y_mm": [
+    107.3,
+    28.5
+  ],
+  "colors": {
+    "case_plastic": "#36383B",
+    "emboss": "#3E4043",
+    "sleeve": "#FAFAFA",
+    "cover_art_default": "#EDEDED"
+  },
+  "nodes": [
+    "NDS_CASE",
+    "CASE_TRAY",
+    "CASE_SPINE_HINGE",
+    "CASE_SPINE",
+    "CASE_LID",
+    "CASE_MEDIUM_ANCHOR",
+    "COVER_ART",
+    "COVER_ART_SPINE",
+    "COVER_ART_BACK",
+    "TRADEMARK_PRINTS",
+    "TRADEMARK_PRINTS_LID"
+  ],
+  "trademark_groups": [
+    "TRADEMARK_PRINTS",
+    "TRADEMARK_PRINTS_LID"
+  ],
+  "triangles": 8278,
+  "generated_by": "Handheld_Cases/NDS/source/build_nds_case.py"
+}

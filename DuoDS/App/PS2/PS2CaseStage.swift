@@ -12,6 +12,10 @@ final class PS2CaseStage {
     let caseNode: SCNNode
     let disc: SCNNode
     let memoryCard: SCNNode
+    /// "不显示卡带盒" (`HandheldCaseSettings.casesHidden`): no case — the Cover Flow card is the bare
+    /// disc (`CartridgeSceneFactory.ps2BareDiscName`), `caseNode` is that card, the disc rests on the
+    /// card's own disc (hidden while this stage exists) and there is no memory card.
+    let isBare: Bool
     private let spine: SCNNode?
     private let lid: SCNNode?
     private let discAnchor: SCNNode?
@@ -40,9 +44,26 @@ final class PS2CaseStage {
         discAnchor = caseNode.childNode(withName: "CASE_DISC_ANCHOR", recursively: true)
         disc = dvd
         self.memoryCard = memoryCard
+        isBare = false
         memoryCard.name = "DUO_PS2_MEMORY_CARD"
         parent.addChildNode(disc)
         parent.addChildNode(memoryCard)
+    }
+
+    /// Bare-disc mode: `card` is the Cover Flow disc card (`CartridgeSceneFactory.ps2DiscScene`).
+    init?(bareDiscCard card: SCNNode, game: GameLibraryItem, parent: SCNNode) {
+        guard let cardDisc = card.childNode(withName: CartridgeSceneFactory.ps2BareDiscName, recursively: true),
+              let dvd = Self.makeDisc(for: game) else { return nil }
+        caseNode = card
+        spine = nil
+        lid = nil
+        discAnchor = cardDisc
+        disc = dvd
+        memoryCard = SCNNode()
+        memoryCard.isHidden = true
+        isBare = true
+        cardDisc.isHidden = true
+        parent.addChildNode(disc)
     }
 
     /// `spine`, `lid`: 0 (closed) … 1 (π/2 each; tray | spine | lid lie flat).
@@ -110,6 +131,7 @@ final class PS2CaseStage {
         setHinges(spine: 0, lid: 0)
         disc.removeFromParentNode()
         memoryCard.removeFromParentNode()
+        if isBare { discAnchor?.isHidden = false }
     }
 
     // MARK: Materials
@@ -133,7 +155,8 @@ final class PS2CaseStage {
     }
 
     /// Real covers (downloaded or local scans) already print the top "PlayStation 2" banner, so the
-    /// model's lid banner is hidden then; a blank insert keeps it. Spine prints always stay.
+    /// model's lid banner is hidden then; a blank insert, or a cover whose banner strip is blank
+    /// (`PS2CoverResolver.hasBlankBanner`), keeps it. Spine prints always stay.
     nonisolated static func applyBannerRule(to caseNode: SCNNode, hasCover: Bool) {
         caseNode.childNode(withName: "TRADEMARK_PRINTS_LID", recursively: true)?.isHidden = hasCover
     }

@@ -101,6 +101,12 @@ enum CartridgeShellColor: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+struct HandheldCaseArt {
+    var full: UIImage?
+    var front: UIImage?
+    var back: UIImage?
+}
+
 struct GameLibraryItem: Identifiable {
     let url: URL
     let title: String
@@ -108,6 +114,12 @@ struct GameLibraryItem: Identifiable {
     let platform: GamePlatform
     let cartridgeKind: GameCardKind
     var icon: UIImage?
+    /// PS2 only: the back of the case insert (`PS2CoverResolver` `.back`), when one was found.
+    var backCover: UIImage? = nil
+    /// DS / 3DS / PSP retail-case insert art (`HandheldCoverResolver.resolveInsert`): a whole
+    /// back | spine | front scan, or the box front (and back) alone. Separate from `icon`, which
+    /// stays the cartridge / UMD label.
+    var caseArt: HandheldCaseArt? = nil
     let isBundledTest: Bool
     let programID: UInt64?
     let productID: String?
@@ -122,15 +134,19 @@ struct GameLibraryItem: Identifiable {
     var isBundledMK64Port: Bool { isBundledTest && url.lastPathComponent == "MK64-3DS.3dsx" }
 }
 
-/// PS2 library settings stored in `UserDefaults.standard` (bind a Settings toggle with
-/// `@AppStorage(PS2LibrarySettings.onlineCoversKey) var onlineCovers = true`).
 enum PS2LibrarySettings {
-    /// Bool, default true: download missing PS2 covers from xlenore/ps2-covers by serial.
-    static let onlineCoversKey = "ps2OnlineCovers"
+    /// Missing covers are always downloaded by serial (front: xlenore/ps2-covers; back: OPL art
+    /// database); there is no setting for it.
+    static let onlineCoversEnabled = true
+}
 
-    static var onlineCoversEnabled: Bool {
-        UserDefaults.standard.object(forKey: onlineCoversKey) as? Bool ?? true
-    }
+/// Retail cases in the library, all platforms (`UserDefaults.standard`; bind with
+/// `@AppStorage(HandheldCaseSettings.hideCasesKey) var hideCases = false`).
+enum HandheldCaseSettings {
+    /// Bool, default false: show the bare cartridge / UMD / PS2 disc instead of its retail case.
+    static let hideCasesKey = "hideHandheldCases"
+
+    static var casesHidden: Bool { UserDefaults.standard.bool(forKey: hideCasesKey) }
 }
 
 struct GameSaveInfo: Identifiable {
@@ -179,6 +195,18 @@ final class GameLibraryStore: ObservableObject {
 
     init() {
         reload()
+        #if DEBUG
+        // `-import-path <file>`: import a ROM or archive at launch, as the Files picker would.
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-import-path"), arguments.indices.contains(index + 1) {
+            let source = URL(fileURLWithPath: arguments[index + 1])
+            Task { [weak self] in
+                let game = await self?.importGame(from: source)
+                print("DUO_IMPORT", game?.title ?? "nil", game?.productID ?? "-", self?.importMessage ?? self?.importError ?? "")
+                fflush(stdout)
+            }
+        }
+        #endif
     }
 
     func originalCover(for game: GameLibraryItem) -> UIImage? {
@@ -249,6 +277,12 @@ final class GameLibraryStore: ObservableObject {
                 shellColor: pro.cartridgeColor
             )
         }
+        .map { game -> GameLibraryItem in
+            var game = game
+            game.backCover = ps2BackCovers[game.id]
+            game.caseArt = handheldCaseArt[game.id]
+            return game
+        }
         .sorted { lhs, rhs in
             let lhsFavorite = DuoProStore.shared.preferences(for: lhs.url).favorite
             let rhsFavorite = DuoProStore.shared.preferences(for: rhs.url).favorite
@@ -266,12 +300,30 @@ final class GameLibraryStore: ObservableObject {
             selectedID = games.first?.id
         }
         requestPS2Covers()
+        requestHandheldCaseArt()
+        refreshReviewSafety()
+    }
+
+    // MARK: Review-safe test games
+
+    /// Hashes the library files that could be App Review test games (`ReviewSafeGames`) off the
+    /// main thread; a card whose answer changed is rebuilt.
+    private func refreshReviewSafety() {
+        let urls = games.map(\.url)
+        Task { [weak self] in
+            let changed = await ReviewSafeGames.warmUp(urls)
+            guard let self, !changed.isEmpty else { return }
+            for index in games.indices where changed.contains(games[index].id) {
+                games[index].appearanceRevision = UUID()
+            }
+        }
     }
 
     // MARK: PS2 covers
 
-    /// Resolved covers by game id, kept for the session so reloads don't hit the disk or network again.
+    /// Resolved covers (front and back) by game id, kept for the session so reloads don't hit the disk or network again.
     private var ps2Covers: [String: UIImage] = [:]
+    private var ps2BackCovers: [String: UIImage] = [:]
     /// Game id → whether online lookup was enabled for the attempt. A miss with online enabled is final
     /// for this launch; a miss while it was disabled is retried once the setting is turned on.
     private var ps2CoverAttempts: [String: Bool] = [:]
@@ -280,11 +332,12 @@ final class GameLibraryStore: ObservableObject {
         ROMFiles.supportDirectory().appendingPathComponent("PS2/Covers", isDirectory: true)
     }
 
-    /// Looks up covers for PS2 games showing no artwork, off the main thread; each result refreshes its card.
+    /// Looks up the missing front and back covers of PS2 games off the main thread; each result
+    /// refreshes its card.
     private func requestPS2Covers() {
         let online = PS2LibrarySettings.onlineCoversEnabled
         let pending = games.filter { game in
-            guard game.platform == .ps2, game.icon == nil else { return false }
+            guard game.platform == .ps2, game.icon == nil || game.backCover == nil else { return false }
             guard let attempt = ps2CoverAttempts[game.id] else { return true }
             return !attempt && online
         }
@@ -293,22 +346,87 @@ final class GameLibraryStore: ObservableObject {
         for game in pending {
             ps2CoverAttempts[game.id] = online
             let id = game.id, url = game.url, serial = game.productID
+            let needsFront = game.icon == nil, needsBack = game.backCover == nil
             Task { [weak self] in
-                let data = await Task.detached(priority: .utility) {
-                    await resolver.resolve(romURL: url, serial: serial,
-                                           directoryHasSingleGame: Self.directoryHasSingleGame(url))
+                let (front, back) = await Task.detached(priority: .utility) { () -> (Data?, Data?) in
+                    let single = Self.directoryHasSingleGame(url)
+                    async let front = needsFront
+                        ? resolver.resolve(romURL: url, serial: serial, directoryHasSingleGame: single) : nil
+                    async let back = needsBack
+                        ? resolver.resolve(romURL: url, serial: serial, directoryHasSingleGame: single, side: .back) : nil
+                    return await (front, back)
                 }.value
-                self?.applyPS2Cover(data, for: id)
+                self?.applyPS2Covers(front: front, back: back, for: id)
             }
         }
     }
 
-    private func applyPS2Cover(_ data: Data?, for id: String) {
-        guard let data, let image = UIImage(data: data) else { return }
-        ps2Covers[id] = image
-        guard let index = games.firstIndex(where: { $0.id == id }), games[index].icon == nil else { return }
-        games[index].icon = image
+    // MARK: DS / 3DS / PSP case covers
+
+    private var handheldCaseArt: [String: HandheldCaseArt] = [:]
+    private var handheldCaseArtAttempts: Set<String> = []
+    private nonisolated static let pspBoxartNames = HandheldCoverResolver.loadPSPNames(
+        from: Bundle.main.url(forResource: "PSP-Boxart-Names", withExtension: "json"))
+
+    nonisolated static var handheldCoverDirectory: URL {
+        ROMFiles.supportDirectory().appendingPathComponent("CaseCovers", isDirectory: true)
+    }
+
+    /// Looks up the retail-case insert art of DS / 3DS / PSP games once per launch, off the main
+    /// thread; each result refreshes its card.
+    private func requestHandheldCaseArt() {
+        let pending = games.filter { game in
+            guard game.caseArt == nil, !handheldCaseArtAttempts.contains(game.id), game.url.scheme != "duo-tutorial" else { return false }
+            return [.nds, .threeDS, .psp].contains(game.platform)
+        }
+        guard !pending.isEmpty else { return }
+        let resolver = HandheldCoverResolver.live(cacheDirectory: Self.handheldCoverDirectory,
+                                                  onlineEnabled: PS2LibrarySettings.onlineCoversEnabled,
+                                                  pspNames: Self.pspBoxartNames)
+        for game in pending {
+            handheldCaseArtAttempts.insert(game.id)
+            let platform: HandheldCasePlatform = switch game.platform {
+            case .threeDS: .threeDS
+            case .psp: .psp
+            default: .nds
+            }
+            let id = game.id, url = game.url
+            // PSPSDK stamps every homebrew EBOOT with the disc ID UCJS10041 (a retail game's), so
+            // a PBP carrying it is homebrew: no box art lookup, local files only.
+            let isHomebrewPBP = platform == .psp && url.pathExtension.lowercased() == "pbp"
+                && game.productID?.replacingOccurrences(of: "-", with: "").uppercased() == "UCJS10041"
+            let productID = isHomebrewPBP ? nil : game.productID
+            Task { [weak self] in
+                let set = await Task.detached(priority: .utility) {
+                    await resolver.resolveInsert(romURL: url, productID: productID, platform: platform,
+                                                 directoryHasSingleGame: Self.directoryHasSingleGame(url))
+                }.value
+                self?.applyHandheldCaseArt(set, for: id)
+            }
+        }
+    }
+
+    private func applyHandheldCaseArt(_ set: HandheldCoverArtSet, for id: String) {
+        guard !set.isEmpty else { return }
+        let art = HandheldCaseArt(full: set.full.flatMap(UIImage.init(data:)),
+                                  front: set.front.flatMap(UIImage.init(data:)),
+                                  back: set.back.flatMap(UIImage.init(data:)))
+        guard art.full != nil || art.front != nil || art.back != nil else { return }
+        handheldCaseArt[id] = art
+        guard let index = games.firstIndex(where: { $0.id == id }) else { return }
+        games[index].caseArt = art
         games[index].appearanceRevision = UUID()
+    }
+
+    private func applyPS2Covers(front: Data?, back: Data?, for id: String) {
+        let frontImage = front.flatMap(UIImage.init(data:)), backImage = back.flatMap(UIImage.init(data:))
+        if let frontImage { ps2Covers[id] = frontImage }
+        if let backImage { ps2BackCovers[id] = backImage }
+        guard let index = games.firstIndex(where: { $0.id == id }) else { return }
+        var changed = false
+        if let frontImage, games[index].icon == nil { games[index].icon = frontImage; changed = true }
+        if let backImage, games[index].backCover == nil { games[index].backCover = backImage; changed = true }
+        if changed { games[index].appearanceRevision = UUID() }
     }
 
     /// True when the ROM's folder holds no other game (a cue and its BIN tracks count as one), so
@@ -484,6 +602,21 @@ final class GameLibraryStore: ObservableObject {
                 messages.append(String(localized: "已自动配置 MK64 游戏资源"))
                 continue
             }
+            var file = file
+            // A homebrew archive laid out as a memory stick (PSP/GAME/<name>/EBOOT.PBP): PPSSPP
+            // treats a PBP under PSP/GAME/ as a game directory and fails to open it as a file, so
+            // the game's folder (with any data next to the EBOOT) moves to the import root.
+            if ext == "pbp" {
+                let parts = file.deletingLastPathComponent().pathComponents
+                if parts.count >= 3, parts[parts.count - 2].uppercased() == "GAME", parts[parts.count - 3].uppercased() == "PSP" {
+                    let gameDirectory = file.deletingLastPathComponent()
+                    let flattened = staging.appendingPathComponent(gameDirectory.lastPathComponent, isDirectory: true)
+                    if !fm.fileExists(atPath: flattened.path) {
+                        try fm.moveItem(at: gameDirectory, to: flattened)
+                        file = flattened.appendingPathComponent(file.lastPathComponent)
+                    }
+                }
+            }
             let canonical = file.deletingPathExtension().appendingPathExtension(ext)
             if canonical != file, fm.fileExists(atPath: canonical.path) { throw ROMFiles.Failure(message: String(localized: "包内含有转换后同名的游戏，请分别导入")) }
             if ext == "z64" {
@@ -539,7 +672,7 @@ final class GameLibraryStore: ObservableObject {
 
     /// Archive covers: an image named like the game anywhere in the archive, or `cover.*` / `folder.*`
     /// when the archive holds a single PS2 game, is copied next to the image as `<basename>.<ext>`
-    /// so `PS2CoverResolver`'s local lookup finds it.
+    /// so `PS2CoverResolver`'s local lookup finds it; likewise `<basename>.back.*` / `back.*` for the back.
     nonisolated private static func keepPS2ArchiveCovers(in staging: URL, games: [URL], fileManager: FileManager) {
         guard !games.isEmpty, let enumerator = fileManager.enumerator(
             at: staging, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]
@@ -552,17 +685,19 @@ final class GameLibraryStore: ObservableObject {
         for game in games {
             let base = game.deletingPathExtension().lastPathComponent
             let directory = game.deletingLastPathComponent().standardizedFileURL
-            let alreadyBeside = images.contains {
-                $0.deletingLastPathComponent().standardizedFileURL == directory &&
-                    $0.deletingPathExtension().lastPathComponent.caseInsensitiveCompare(base) == .orderedSame
+            for (name, generic) in [(base, ["cover", "folder"]), ("\(base).back", ["back"])] {
+                let alreadyBeside = images.contains {
+                    $0.deletingLastPathComponent().standardizedFileURL == directory &&
+                        $0.deletingPathExtension().lastPathComponent.caseInsensitiveCompare(name) == .orderedSame
+                }
+                guard !alreadyBeside else { continue }
+                let stem: (URL) -> String = { $0.deletingPathExtension().lastPathComponent.lowercased() }
+                let source = images.first { stem($0) == name.lowercased() }
+                    ?? (games.count == 1 ? images.first { generic.contains(stem($0)) } : nil)
+                guard let source else { continue }
+                let target = directory.appendingPathComponent("\(name).\(source.pathExtension.lowercased())")
+                if !fileManager.fileExists(atPath: target.path) { try? fileManager.copyItem(at: source, to: target) }
             }
-            guard !alreadyBeside else { continue }
-            let stem: (URL) -> String = { $0.deletingPathExtension().lastPathComponent.lowercased() }
-            let source = images.first { stem($0) == base.lowercased() }
-                ?? (games.count == 1 ? images.first { ["cover", "folder"].contains(stem($0)) } : nil)
-            guard let source else { continue }
-            let target = directory.appendingPathComponent("\(base).\(source.pathExtension.lowercased())")
-            if !fileManager.fileExists(atPath: target.path) { try? fileManager.copyItem(at: source, to: target) }
         }
     }
 
@@ -1118,7 +1253,8 @@ private enum ROMMetadataReader {
         guard bannerOffset > 0,
               let banner = try? read(handle, offset: UInt64(bannerOffset), count: 0x840),
               banner.count >= 0x840 else {
-            return ROMMetadata(title: headerTitle, detail: gameCode, icon: nil, cartridgeKind: cartridgeKind)
+            return ROMMetadata(title: headerTitle, detail: gameCode, icon: nil, cartridgeKind: cartridgeKind,
+                               productID: ndsProductID(gameCode))
         }
 
         let localizedTitleBlock = [1, 0, 6, 7, 2, 3, 4, 5]
@@ -1133,8 +1269,18 @@ private enum ROMMetadataReader {
             title: localizedTitle ?? headerTitle,
             detail: gameCode.isEmpty ? "Nintendo DS" : gameCode,
             icon: ndsIcon(from: banner),
-            cartridgeKind: cartridgeKind
+            cartridgeKind: cartridgeKind,
+            productID: ndsProductID(gameCode)
         )
+    }
+
+    /// The 4-character game code (e.g. `A2DE`) when it looks like a retail one; homebrew often
+    /// leaves `####` or zeros there.
+    private static func ndsProductID(_ gameCode: String) -> String? {
+        let code = gameCode.uppercased()
+        guard code.count == 4, code.unicodeScalars.allSatisfy({ ("A"..."Z").contains($0) || ("0"..."9").contains($0) }),
+              code != "####", code != "0000" else { return nil }
+        return code
     }
 
     private static func read3DS(from url: URL) -> ROMMetadata {
@@ -1164,13 +1310,34 @@ private enum ROMMetadataReader {
             var retailMetadata = metadata
             retailMetadata.cartridgeKind = .threeDS
             retailMetadata.programID = readProgramID(from: handle)
+            retailMetadata.productID = readProductCode(from: handle)
             return retailMetadata
         }
         return ROMMetadata(
             detail: url.pathExtension.lowercased() == "3dsx" ? "3DS Homebrew" : "Nintendo 3DS",
             cartridgeKind: .threeDS,
-            programID: readProgramID(from: handle)
+            programID: readProgramID(from: handle),
+            productID: readProductCode(from: handle)
         )
+    }
+
+    /// NCCH product code (0x150, e.g. `CTR-P-AMKE`), which is outside the encrypted regions.
+    private static func readProductCode(from handle: FileHandle) -> String? {
+        guard let header = try? read(handle, offset: 0, count: 0x200), header.count == 0x200 else { return nil }
+        let magic = String(data: header.subdata(in: 0x100..<0x104), encoding: .ascii)
+        let ncchOffset: UInt64
+        if magic == "NCCH" {
+            ncchOffset = 0
+        } else if magic == "NCSD" {
+            ncchOffset = UInt64(littleEndian32(header, at: 0x120)) * 0x200
+        } else {
+            return nil
+        }
+        guard let ncch = try? read(handle, offset: ncchOffset, count: 0x160), ncch.count >= 0x160,
+              String(data: ncch.subdata(in: 0x100..<0x104), encoding: .ascii) == "NCCH" else { return nil }
+        let code = ascii(ncch[0x150..<0x160])
+        guard code.hasPrefix("CTR-") || code.hasPrefix("KTR-") else { return nil }
+        return code
     }
 
     private static func readProgramID(from handle: FileHandle) -> UInt64? {
@@ -1393,6 +1560,7 @@ struct GameLibraryView: View {
     @State private var stageActive = false
     @State private var cameraClearance: CGFloat = 64
     @AppStorage("scrollCueEnabled") private var scrollCueEnabled = true
+    @AppStorage(HandheldCaseSettings.hideCasesKey) private var hideCases = false
     #if DEBUG
     @State private var previewPaneWidth: CGFloat?
     #endif
@@ -1463,14 +1631,15 @@ struct GameLibraryView: View {
             if let game = selectedGame {
                 VStack(spacing: 13) {
                     if scrollCueEnabled {
-                        // PS2 cases open with a tap first, so no pull-down cue; its space stays
-                        // so the title does not jump while scrolling between platforms.
-                        let tapToOpen = game.platform == .ps2
+                        // A retail case opens first, so the pull-down cue only shows for a bare
+                        // cartridge / UMD / disc; its space stays so the title does not jump.
+                        let tapToOpen = !hideCases && [.ps2, .nds, .threeDS, .psp].contains(game.platform)
                         SegmentedScrollCue(paused: stageActive || isExiting || tapToOpen)
                             .opacity(tapToOpen ? 0 : 1)
                             .padding(.bottom, 1)
                     }
-                    Text(game.platform.rawValue.uppercased())
+                    // App Review test games name no console maker (ReviewSafeGames).
+                    Text((ReviewSafeGames.isReviewSafe(game) ? String(localized: "开源测试游戏") : game.platform.rawValue).uppercased())
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .tracking(2)
                         .foregroundStyle(Color(red: 0.64, green: 0.77, blue: 0.81))
@@ -1656,9 +1825,40 @@ enum CartridgeSceneFactory {
         guard let url = Bundle.main.url(forResource: "PSP-UMD-Shell", withExtension: "usdz") else { return nil }
         return try? SCNScene(url: url)
     }()
+    /// The library's Cover Flow card for `game` (`cartridgeModel`): DS / 3DS / PSP games in their
+    /// retail case holding the medium (`handheldCaseScene`), PS2 games in theirs; with
+    /// `HandheldCaseSettings.casesHidden` the bare medium (a PS2 game shows its disc).
+    static func scene(for game: GameLibraryItem) -> SCNScene {
+        if let caseScene = handheldCaseScene(for: game) { return caseScene }
+        if game.cartridgeKind == .ps2Case, HandheldCaseSettings.casesHidden,
+           let disc = ps2DiscScene(for: game) { return disc }
+        return mediumScene(for: game)
+    }
+
+    /// DS / 3DS / PSP retail case with the game's insert, holding a clone of the medium the library
+    /// showed before (`mediumScene`) at `CASE_MEDIUM_ANCHOR`. nil: no case for this game.
+    static func handheldCaseScene(for game: GameLibraryItem) -> SCNScene? {
+        guard let kind = HandheldCaseKind(game: game) else { return nil }
+        let medium = mediumScene(for: game).rootNode.childNode(withName: "cartridgeModel", recursively: true)
+        medium?.removeFromParentNode()
+        guard let caseNode = HandheldCaseAssets.makeCase(kind, insert: handheldInsertTexture(for: game),
+                                                         medium: medium,
+                                                         reviewSafe: ReviewSafeGames.isReviewSafe(game)) else { return nil }
+        let scene = SCNScene()
+        scene.rootNode.name = game.id
+        let model = SCNNode()
+        model.name = "cartridgeModel"
+        model.eulerAngles = SCNVector3(-0.05, -0.08, 0)
+        model.addChildNode(caseNode)
+        scene.rootNode.addChildNode(model)
+        HandheldCaseAssets.addPreviewRig(to: scene)
+        return scene
+    }
+
     // Real DS/3DS cards are approximately 33 × 35 × 3.8 mm. SceneKit units
     // below are millimetres so the thickness and face proportions stay real.
-    static func scene(for game: GameLibraryItem) -> SCNScene {
+    /// The bare medium (DS / 3DS card, UMD, or the PS2 case), as the library showed it before cases.
+    static func mediumScene(for game: GameLibraryItem) -> SCNScene {
         if game.cartridgeKind == .umd { return umdScene(for: game) }
         if game.cartridgeKind == .ps2Case { return ps2CaseScene(for: game) }
         let scene = SCNScene()
@@ -1669,9 +1869,11 @@ enum CartridgeSceneFactory {
         model.eulerAngles = SCNVector3(-0.07, -0.10, 0)
         scene.rootNode.addChildNode(model)
 
+        let reviewSafe = ReviewSafeGames.isReviewSafe(game)
         let detailed = detailedModels?.rootNode.childNode(withName: game.cartridgeKind.modelNodeName, recursively: true)?.clone()
         if let detailed {
             detailed.position = SCNVector3Zero
+            if reviewSafe { ReviewSafeScene.hideTrademarkNodes(in: detailed) }
             model.addChildNode(detailed)
         } else {
         let shellPath = silhouette(for: game.cartridgeKind)
@@ -1683,8 +1885,8 @@ enum CartridgeSceneFactory {
         shellNode.name = "cartridgeShell"
         shellNode.position.z = -1.9
         model.addChildNode(shellNode)
-        addEmbossedMark(to: model, kind: game.cartridgeKind)
-        addBackContacts(to: model, kind: game.cartridgeKind)
+        if !reviewSafe { addEmbossedMark(to: model, kind: game.cartridgeKind) }
+        addBackContacts(to: model, kind: game.cartridgeKind, markings: !reviewSafe)
         }
 
         if let color = game.shellColor {
@@ -1909,6 +2111,7 @@ enum CartridgeSceneFactory {
                 }
             }
             lettering.forEach { filledUMDBadgeLetter($0) }
+            if ReviewSafeGames.isReviewSafe(game) { ReviewSafeScene.hideTrademarkNodes(in: source) }
             model.addChildNode(source)
         } else {
             let shell = SCNCylinder(radius: 31.8, height: 4.2)
@@ -1956,9 +2159,10 @@ enum CartridgeSceneFactory {
     }()
 
     /// PS2-Case.usdz is in metres (Y-up, root at the bottom centre). The carousel works in DS-card
-    /// millimetres (UMDs are shown at 0.7×, ≈45 units); 300 units/m makes the 190 mm case 57 units
-    /// tall — about 1.25× a UMD, so it still fits one Cover Flow slot.
-    static let ps2CaseUnitsPerMetre: Float = 300
+    /// millimetres (UMDs are shown at 0.7×, ≈45 units); 247 units/m makes the 190 mm case 47 units
+    /// tall, which clears the platform and title text under the shelf. The DS / 3DS / PSP cases use
+    /// the same scale, so the cases keep their real sizes relative to each other.
+    static let ps2CaseUnitsPerMetre: Float = 247
 
     /// Closed PS2 case with the game's cover insert, wrapped as the shared `cartridgeModel` node.
     static func ps2CaseScene(for game: GameLibraryItem) -> SCNScene {
@@ -1974,7 +2178,8 @@ enum CartridgeSceneFactory {
             caseNode.scale = SCNVector3(scale, scale, scale)
             caseNode.position = SCNVector3(0, -0.095 * scale, 0)  // centre the 190 mm height
             applyPS2CoverInsert(ps2InsertTexture(for: game), to: caseNode)
-            PS2CaseStage.applyBannerRule(to: caseNode, hasCover: game.icon != nil)
+            let cover = game.icon?.cgImage
+            PS2CaseStage.applyBannerRule(to: caseNode, hasCover: cover.map { !PS2CoverResolver.hasBlankBanner($0) } ?? false)
             model.addChildNode(caseNode)
         } else {
             let box = SCNBox(width: CGFloat(0.135 * scale), height: CGFloat(0.19 * scale),
@@ -2044,7 +2249,8 @@ enum CartridgeSceneFactory {
 
     /// Insert sheet (273 × 183 mm, laid out back | spine | front as seen from outside): the cover,
     /// aspect-filled and centre-cropped to the 129.5 × 183 mm front, with its dominant colour extended
-    /// over the spine and back. Without a cover, a blank insert carrying the title.
+    /// over the spine (and the back, unless a back cover was found, which fills the back the same way).
+    /// Without a cover, a generated `PS2PlaceholderInsert` carrying the title.
     static func ps2InsertTexture(for game: GameLibraryItem) -> UIImage {
         let key = "\(game.id)|\(game.appearanceRevision)" as NSString
         if let cached = ps2InsertCache.object(forKey: key) { return cached }
@@ -2071,14 +2277,14 @@ enum CartridgeSceneFactory {
         ctx.fill(CGRect(origin: .zero, size: size))
         if let cover {
             UIImage(cgImage: cover.front).draw(in: frontRect)
-        } else {
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.alignment = .center
-            (game.title as NSString).draw(
-                in: frontRect.insetBy(dx: 70, dy: 0).offsetBy(dx: 0, dy: size.height * 0.42),
-                withAttributes: [.font: UIFont.systemFont(ofSize: 64, weight: .bold),
-                                 .foregroundColor: UIColor(white: 0.18, alpha: 1),
-                                 .paragraphStyle: paragraph])
+            if let back = game.backCover?.cgImage,
+               let cropped = back.cropping(to: PS2CoverResolver.frontCropRect(imageSize: CGSize(width: back.width, height: back.height))) {
+                ctx.interpolationQuality = .high
+                UIImage(cgImage: cropped).draw(in: CGRect(x: 0, y: 0, width: size.width - frontRect.minX, height: size.height))
+            }
+        } else if let placeholder = PS2PlaceholderInsert.render(
+            title: game.title, subtitle: game.productID, width: Int(size.width), height: Int(size.height)) {
+            UIImage(cgImage: placeholder).draw(in: CGRect(origin: .zero, size: size))
         }
         UIGraphicsPopContext()
         guard let rendered = ctx.makeImage() else { return UIImage() }
@@ -2362,7 +2568,8 @@ enum CartridgeSceneFactory {
         return UIFont.systemFont(ofSize: size, weight: .semibold)
     }
 
-    private static func addBackContacts(to model: SCNNode, kind: GameCardKind) {
+    /// `markings` false leaves out the moulded brand and model number (review-safe test games).
+    private static func addBackContacts(to model: SCNNode, kind: GameCardKind, markings: Bool = true) {
         let isLightShell = kind == .threeDS || kind == .dsiExclusive || kind == .umd
 
         let contactBed = SCNBox(width: 27.2, height: 11.4, length: 0.12, chamferRadius: 0.65)
@@ -2401,6 +2608,7 @@ enum CartridgeSceneFactory {
             ribNode.position = SCNVector3(start - spacing / 2 + Float(index) * spacing, -9.35, -4.01)
             model.addChildNode(ribNode)
         }
+        guard markings else { return }
 
         let moldedText = SCNText(string: kind.brand, extrusionDepth: 0.018)
         moldedText.font = UIFont.systemFont(ofSize: 1.35, weight: .semibold)

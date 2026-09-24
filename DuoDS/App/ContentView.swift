@@ -588,7 +588,7 @@ private struct GameSettingsView: View {
     @Binding var renderMode: DuoRenderMode
     @AppStorage("pspRenderMode") private var pspRenderMode = DuoRenderMode.hd
     @AppStorage("pspFrameRateMode") private var pspFrameRateMode = DuoPSPFrameRateMode.high
-    @AppStorage(PS2LibrarySettings.onlineCoversKey) private var ps2OnlineCovers = true
+    @AppStorage(HandheldCaseSettings.hideCasesKey) private var hideHandheldCases = false
     let replayGuide: () -> Void
     let dismiss: () -> Void
 
@@ -636,8 +636,8 @@ private struct GameSettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Section(String(localized: "游戏库")) {
-                Toggle(String(localized: "自动下载 PS2 封面"), isOn: $ps2OnlineCovers)
-                Text(String(localized: "按游戏编号从社区封面库下载 PS2 封面。关闭后只使用本地图片或空白封面。"))
+                Toggle(String(localized: "不显示卡带盒"), isOn: $hideHandheldCases)
+                Text(String(localized: "开启后，游戏库直接显示卡带、UMD 或 PS2 光盘，不再显示卡带盒。PS2 存档可在“存档管理”中查看和删除。"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 NavigationLink {
@@ -929,7 +929,7 @@ private struct CartridgeAppearanceEditor: View {
                 platform: game.platform, cartridgeKind: game.cartridgeKind, icon: cover,
                 isBundledTest: game.isBundledTest, programID: game.programID, productID: game.productID,
                 engraving: text.isEmpty ? nil : text, shellColor: shellColor)
-            previewScene = CartridgeSceneFactory.scene(for: item)
+            previewScene = CartridgeSceneFactory.mediumScene(for: item)
         }
         .task(id: photo) {
             guard let photo else { return }
@@ -1443,7 +1443,7 @@ private struct EmulatorView: View {
             if game.platform == .ps2 {
                 PS2GameView(session: nil, game: game, title: game.title, cover: game.icon?.cgImage, onExitRequested: onExit)
             } else if session.isPSP {
-                PSPGameView(session: session, onExit: onExit)
+                PSPGameView(session: session, onExit: onExit, reviewSafe: ReviewSafeGames.isReviewSafe(game))
             } else if session.isN64 {
                 N64GameView(session: session, onExit: onExit)
             } else if let topImage = session.topImage, let bottomImage = session.bottomImage {
@@ -3067,9 +3067,12 @@ private struct PSP2000SceneView: UIViewRepresentable {
     let controlsLocked: Bool
     let onExit: () -> Void
     var onControl: ((String) -> Void)? = nil
+    /// App Review test game (`ReviewSafeGames`): no SONY / PlayStation / PSP / UMD prints.
+    var reviewSafe = false
 
     func makeUIView(context: Context) -> SCNView {
         let view = PSP2000InteractiveSCNView(frame: .zero)
+        ReviewSafeScene.applyConsole(reviewSafe, to: model.scene.rootNode)
         view.scene = model.scene
         view.pointOfView = model.cameraNode
         view.runtimeModel = model
@@ -3692,6 +3695,7 @@ private final class PSP2000InteractiveSCNView: SCNView {
 private struct PSPGameView: View {
     @ObservedObject var session: EmulatorSession
     let onExit: () -> Void
+    var reviewSafe = false
     @State private var controlsLocked = false
     @StateObject private var model = PSP2000RuntimeModel()
 
@@ -3711,7 +3715,8 @@ private struct PSPGameView: View {
                         image: session.pspUsesSharedBuffer ? nil : session.topImage,
                         session: session,
                         controlsLocked: controlsLocked,
-                        onExit: onExit
+                        onExit: onExit,
+                        reviewSafe: reviewSafe
                     )
                         .accessibilityLabel(String(localized: "PSP-2000 银色实体操作界面"))
                     PSPModelIndicatorDriver(
