@@ -576,7 +576,7 @@ final class GameLibraryStore: ObservableObject {
                 continue
             }
             if ext == "o2r" {
-                guard file.lastPathComponent.lowercased() == "mk64.o2r" else { throw ROMFiles.Failure(message: String(localized: "O2R 是移植游戏资源，请使用对应游戏的数据导入方式")) }
+                guard ROMFiles.hasBundledMK64Port, file.lastPathComponent.lowercased() == "mk64.o2r" else { throw ROMFiles.Failure(message: String(localized: "O2R 是移植游戏资源，请使用对应游戏的数据导入方式")) }
                 let directory = ROMFiles.mk64Directory(support)
                 try fm.createDirectory(at: directory, withIntermediateDirectories: true)
                 let target = directory.appendingPathComponent("mk64.o2r")
@@ -606,7 +606,7 @@ final class GameLibraryStore: ObservableObject {
             if ext == "z64" {
                 try ROMFiles.normalizeN64(file, to: canonical)
                 if canonical != file { try fm.removeItem(at: file) }
-                if try ROMFiles.isMarioKartUSA(canonical) {
+                if ROMFiles.hasBundledMK64Port, try ROMFiles.isMarioKartUSA(canonical) {
                     let directory = ROMFiles.mk64Directory(support)
                     try fm.createDirectory(at: directory, withIntermediateDirectories: true)
                     let target = directory.appendingPathComponent("mk64.z64")

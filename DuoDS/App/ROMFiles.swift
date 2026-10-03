@@ -254,6 +254,9 @@ enum ROMFiles {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
     }
     static func azaharSaves(_ support: URL) -> URL { support.appendingPathComponent("Azahar/Saves", isDirectory: true) }
+    /// The MK64 3DS port is a Debug-only test fixture (excluded from Release resources); without it
+    /// an MK64 ROM or mk64.o2r must not be routed to the port.
+    static var hasBundledMK64Port: Bool { Bundle.main.url(forResource: "MK64-3DS", withExtension: "3dsx") != nil }
     static func mk64Directory(_ support: URL) -> URL { azaharSaves(support).appendingPathComponent("Azahar/sdmc/3ds/MK64", isDirectory: true) }
 
     /// Every archive is fully extracted and checked before any file is added to the library.

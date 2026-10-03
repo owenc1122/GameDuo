@@ -1,0 +1,153 @@
+# Game Duo iOS build on GitHub's macOS runners. Fallback only: the owner's Mac is the main build
+# machine, and private-repo macOS minutes are scarce (10x billing), so this runs on demand only.
+#
+# ThirdParty/ is git-ignored; the only part the Xcode project needs is ThirdParty/StoreCores
+# (five prebuilt xcframeworks). tools/export_vendor.sh (branch export-vendor-tool) publishes them,
+# once, from the Mac that has them: GitHub release `vendor-cores` or, without gh, branch `vendor-bin`.
+#
+# mode=compile    unsigned Release build for iphoneos + Release content checks (cheapest, do this first)
+# mode=simulator  Debug build for the simulator, .app uploaded for comparison screenshots
+# mode=archive    signed App Store archive + IPA via the ASC API key (secrets ASC_KEY_ID,
+#                 ASC_ISSUER_ID, ASC_KEY_P8); upload=true also sends it to App Store Connect
+name: ios-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [compile, simulator, archive]
+        default: compile
+      upload:
+        description: archive only, upload the IPA to App Store Connect
+        type: boolean
+        default: false
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      STORE_XCODE: /Applications/Xcode_27.0.app
+      SIM_XCODE: /Applications/Xcode_27.1.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch StoreCores (build 13 binaries)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p ThirdParty "$RUNNER_TEMP/cores"
+          if gh release download vendor-cores -p 'StoreCores-build13.tgz' -D "$RUNNER_TEMP/cores" 2>/dev/null; then
+            echo "from release vendor-cores"
+          elif git fetch -q --depth=1 origin refs/heads/vendor-bin; then
+            git archive FETCH_HEAD | tar -x -C "$RUNNER_TEMP/cores"
+            cat "$RUNNER_TEMP"/cores/StoreCores-build13.tgz.part-* > "$RUNNER_TEMP/cores/StoreCores-build13.tgz"
+            echo "from branch vendor-bin"
+          else
+            echo "::error::No StoreCores yet: run tools/export_vendor.sh on the Mac first"; exit 1
+          fi
+          tar -xzf "$RUNNER_TEMP/cores/StoreCores-build13.tgz" -C ThirdParty
+          if git fetch -q --depth=1 origin refs/heads/vendor-export; then
+            git show FETCH_HEAD:vendor/StoreCores.sha256 > "$RUNNER_TEMP/cores.sha256"
+            (cd ThirdParty/StoreCores && shasum -a 256 -c --quiet "$RUNNER_TEMP/cores.sha256")
+            echo "StoreCores match the exported checksums"
+          fi
+          ls ThirdParty/StoreCores
+
+      # Test ROMs are git-ignored and excluded from Release (EXCLUDED_SOURCE_FILE_NAMES); empty
+      # stand-ins keep the Debug resource phase from failing on missing files.
+      - name: Test fixture stand-ins
+        run: |
+          mkdir -p TestFixtures/3DS
+          for f in FuzedNeo.nds TrailMix.nds MK64-3DS.3dsx 3DS/Mars3D.3dsx 3DS/HomebrewMenu.3dsx; do
+            [ -e "TestFixtures/$f" ] || : > "TestFixtures/$f"
+          done
+
+      - name: Source checks
+        run: |
+          set -eu
+          if grep -rniE "deltacore|MelonDSGameInput|ZIPFoundation|ReviewSafe" DuoDS DuoDS.xcodeproj DuoDS.xcworkspace; then
+            echo "::error::Delta / review special-case references are back"; exit 1
+          fi
+
+      - name: Release build (unsigned)
+        if: inputs.mode == 'compile'
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s "$STORE_XCODE"
+          xcodebuild -version
+          xcodebuild -project DuoDS.xcodeproj -target DuoDS -configuration Release -sdk iphoneos \
+            SYMROOT="$RUNNER_TEMP/build" CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/build.log"
+          APP="$RUNNER_TEMP/build/Release-iphoneos/DuoDS.app"
+          [ -d "$APP" ] || APP=$(find "$RUNNER_TEMP/build" -name '*.app' -maxdepth 2 | head -1)
+          {
+            echo "app: $APP"
+            /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' -c 'Print :CFBundleVersion' "$APP/Info.plist"
+            echo "--- test fixtures in bundle (must be empty)"
+            find "$APP" \( -iname '*.3dsx' -o -iname '*.nds' -o -iname '*mk64*' -o -iname '*tic-tac*' \) || true
+            echo "--- Delta symbols/strings in bundle (must be empty)"
+            grep -rlaE "DeltaCore|MelonDSDeltaCore|ZIPFoundation" "$APP" || true
+            echo "--- frameworks"
+            ls "$APP/Frameworks" || true
+            du -sh "$APP"
+          } | tee "$RUNNER_TEMP/release-checks.txt"
+
+      - name: Simulator build (Debug)
+        if: inputs.mode == 'simulator'
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s "$SIM_XCODE"
+          xcodebuild -project DuoDS.xcodeproj -target DuoDS -configuration Debug -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/build" CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/build.log"
+          (cd "$RUNNER_TEMP/build/Debug-iphonesimulator" && zip -qry "$RUNNER_TEMP/DuoDS-sim.zip" DuoDS.app)
+
+      - name: App Store archive
+        if: inputs.mode == 'archive'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s "$STORE_XCODE"
+          KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          xcodebuild -project DuoDS.xcodeproj -scheme DuoDS -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/DuoDS.xcarchive" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Development" \
+            PROVISIONING_PROFILE_SPECIFIER= DEVELOPMENT_TEAM=AHVDBX7277 "${AUTH[@]}" archive 2>&1 | tee "$RUNNER_TEMP/build.log"
+          DEST=export; [ "${{ inputs.upload }}" = true ] && DEST=upload
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>$DEST</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>AHVDBX7277</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/DuoDS.xcarchive" -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" "${AUTH[@]}" 2>&1 | tee -a "$RUNNER_TEMP/build.log"
+          rm -f "$KEY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gameduo-${{ inputs.mode }}-${{ github.run_number }}
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/build.log
+            ${{ runner.temp }}/release-checks.txt
+            ${{ runner.temp }}/DuoDS-sim.zip
+            ${{ runner.temp }}/export/*.ipa
