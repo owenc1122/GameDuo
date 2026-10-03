@@ -1,0 +1,245 @@
+diff --git a/Common/MemArenaDarwin.cpp b/Common/MemArenaDarwin.cpp
+index c6f91ea..3138c25 100644
+--- a/Common/MemArenaDarwin.cpp
++++ b/Common/MemArenaDarwin.cpp
+@@ -28,6 +28,7 @@
+ 
+ #include <mach/mach.h>
+ #include <mach/vm_map.h>
++#include <TargetConditionals.h>
+ 
+ #include "Common/Log.h"
+ #include "Common/File/FileUtil.h"
+@@ -85,18 +86,12 @@ void MemArena::ReleaseView(s64 offset, void* view, size_t size) {
+ }
+ 
+ bool MemArena::NeedsProbing() {
+-#if PPSSPP_PLATFORM(IOS) && PPSSPP_ARCH(64BIT)
+-	return true;
+-#else
++	// Modern 64-bit iOS can reserve a contiguous virtual range. Probing low
++	// addresses conflicts with the other emulator cores already loaded by Duo.
+ 	return false;
+-#endif
+ }
+ 
+ u8* MemArena::Find4GBBase() {
+-#if PPSSPP_PLATFORM(IOS) && PPSSPP_ARCH(64BIT)
+-	// The caller will need to do probing, like on 32-bit Windows.
+-	return nullptr;
+-#else
+ 	size_t size;
+ #if PPSSPP_ARCH(64BIT)
+ 	size = 0xE1000000;
+@@ -111,7 +106,6 @@ u8* MemArena::Find4GBBase() {
+ 		vm_deallocate(mach_task_self(), addr, size);
+ 		return (u8 *)addr;
+ 	}
+-#endif
+ 	return nullptr;
+ }
+ 
+diff --git a/Core/CoreTiming.cpp b/Core/CoreTiming.cpp
+index d290a88..5be873f 100644
+--- a/Core/CoreTiming.cpp
++++ b/Core/CoreTiming.cpp
+@@ -28,6 +28,7 @@
+ #include "Common/Serialize/Serializer.h"
+ #include "Common/Serialize/SerializeList.h"
+ #include "Core/CoreTiming.h"
++#include "Core/DuoFrameRate.h"
+ #include "Core/Core.h"
+ #include "Core/Config.h"
+ #include "Core/HLE/sceKernelThread.h"
+@@ -66,12 +67,19 @@ static s64 breakDeadlineUs;
+ static s64 breakDeadlineTicks;
+ static void RecomputeBreakDeadline();
+ 
++// Frontend performance preference. The game's latest request is retained so
++// dropping the override restores its own clock, including requests during play.
++static int duoClockFloorHz = 0;
++static int duoRequestedClockHz = initialHz;
++
+ bool SetClockFrequencyHz(int cpuHz) {
+ 	if (cpuHz <= 0) {
+ 		// Paranoid check, protecting against division by zero and similar nonsense.
+ 		return true;  // encourage logging
+ 	}
+ 
++	duoRequestedClockHz = cpuHz;
++	if (duoClockFloorHz > cpuHz) cpuHz = duoClockFloorHz;
+ 	if (cpuHz == CPU_HZ) {
+ 		// Already at the correct frequency. Bail, false means we'll log at a lower level.
+ 		return false;
+@@ -92,6 +100,12 @@ bool SetClockFrequencyHz(int cpuHz) {
+ 	return true;
+ }
+ 
++void DuoSetClockFloorHz(int hz) {
++	if (duoClockFloorHz == hz) return;
++	duoClockFloorHz = hz;
++	SetClockFrequencyHz(duoRequestedClockHz);
++}
++
+ int GetClockFrequencyHz() {
+ 	return CPU_HZ;
+ }
+@@ -224,6 +238,8 @@ void Init(MIPSState *mips) {
+ 	breakDeadlineUs = 0;
+ 	breakDeadlineTicks = 0;
+ 	CPU_HZ = initialHz;
++	duoClockFloorHz = 0;
++	duoRequestedClockHz = initialHz;
+ }
+ 
+ void Shutdown()
+@@ -563,6 +579,10 @@ void DoState(PointerWrap &p) {
+ 	}
+ 
+ 	Do(p, CPU_HZ);
++	if (p.mode == p.MODE_READ) {
++		duoClockFloorHz = 0;
++		duoRequestedClockHz = CPU_HZ;
++	}
+ 	Do(p, slicelength);
+ 	Do(p, globalTimer);
+ 	Do(p, idledCycles);
+diff --git a/SDL/macOS b/SDL/macOS
+--- a/SDL/macOS
++++ b/SDL/macOS
+@@ -1 +1 @@
+-Subproject commit c387d93ab5910b5a6be78b4840a5bbbc452f3ac8
++Subproject commit c387d93ab5910b5a6be78b4840a5bbbc452f3ac8-dirty
+diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
+index 8f2830b..88879a1 100644
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -35,6 +35,8 @@
+ #include "Core/MemMap.h"
+ #include "Core/System.h"
+ #include "Core/CoreTiming.h"
++#include "Core/DuoFrameRate.h"
++#include "Common/GPU/ShaderTranslation.h"
+ #include "Core/HW/Display.h"
+ #include "Core/CwCheat.h"
+ #include "Core/ELF/ParamSFO.h"
+@@ -508,6 +510,15 @@ static void check_variables(CoreParameter &coreParam)
+    int iMultiSampleLevel_prev;
+    bool bDisplayCropTo16x9_prev;
+ 
++   // Duo's single-pass antialiasing replaces the presentation blit. Only
++   // opt in when requested by the frontend; other libretro hosts are unchanged.
++   var.key = "duo_psp_antialias";
++   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
++      g_Config.vPostShaderNames = !strcmp(var.value, "enabled")
++         ? std::vector<std::string>{"DuoFXAA"} : std::vector<std::string>{};
++      INFO_LOG(Log::G3D, "Duo antialiasing: %s", var.value);
++   }
++
+    var.key = "ppsspp_language";
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+@@ -1162,6 +1173,7 @@ static const struct retro_controller_info ports[] =
+ 
+ void retro_init(void)
+ {
++   ShaderTranslationInit(); // GLES post-processing needs the GLSL translator, as in NativeApp.
+    TimeInit();
+    SetCurrentThreadName("Main");
+ 
+@@ -1282,6 +1294,7 @@ void retro_init(void)
+ void retro_deinit(void)
+ {
+    g_threadManager.Teardown();
++   ShaderTranslationShutdown();
+    g_logManager.Shutdown();
+    log_cb = NULL;
+ 
+@@ -1331,12 +1344,40 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
+ 
+ unsigned retro_api_version(void) { return RETRO_API_VERSION; }
+ 
++// The frontend only exchanges atomics. Timing changes and display reads stay
++// on the emulation thread, including with threaded GL rendering.
++static std::atomic<bool> duoHighFrameRate{false};
++static std::atomic<bool> duoDisableAntialias{false};
++static std::atomic<uint64_t> duoDisplayCounters{0};
++static std::atomic<unsigned> duoClockStatus{0};
++extern "C" RETRO_API void retro_duo_set_high_frame_rate(bool enabled) {
++   duoHighFrameRate.store(enabled);
++}
++extern "C" RETRO_API void retro_duo_disable_antialias() {
++   duoDisableAntialias.store(true);
++}
++extern "C" RETRO_API uint64_t retro_duo_display_counters() {
++   return duoDisplayCounters.load();
++}
++extern "C" RETRO_API unsigned retro_duo_clock_status() {
++   return duoClockStatus.load();
++}
++
+ namespace Libretro {
+    bool useEmuThread = false;
+    std::atomic<EmuThreadState> emuThreadState(EmuThreadState::DISABLED);
+ 
+    static std::thread emuThread;
+    static void EmuFrame() {
++      const bool clockCompatible = !PSP_CoreParameter().compat.flags().RequireDefaultCPUClock;
++      CoreTiming::DuoSetClockFloorHz(duoHighFrameRate.load() && clockCompatible ? 333000000 : 0);
++      duoClockStatus.store((unsigned)CoreTiming::GetClockFrequencyHz() | (clockCompatible ? 0 : 0x80000000u));
++      // Apply on the emulation thread, never mutate render configuration from
++      // the frontend while threaded GL is using it. Remain off until reload.
++      if (duoDisableAntialias.load() && !g_Config.vPostShaderNames.empty()) {
++         g_Config.vPostShaderNames.clear();
++         if (gpu) gpu->NotifyDisplayResized();
++      }
+       ctx->SetRenderTarget();
+       Draw::DrawContext *draw = ctx->GetDrawContext();
+       if (draw) {
+@@ -1349,6 +1390,8 @@ namespace Libretro {
+       }
+ 
+       PSP_RunLoopWhileState();
++      duoDisplayCounters.store((uint64_t)(uint32_t)__DisplayGetNumVblanks() << 32 |
++                               (uint32_t)gpuStats.totals.numFlips);
+       switch (coreState) {
+       case CORE_NEXTFRAME:
+       case CORE_POWERDOWN:
+@@ -1474,6 +1517,7 @@ static void retro_check_backend(void) {
+ }
+ 
+ bool retro_load_game(const struct retro_game_info *game) {
++   duoDisableAntialias.store(false);
+    retro_pixel_format fmt = retro_pixel_format::RETRO_PIXEL_FORMAT_XRGB8888;
+    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt)) {
+       ERROR_LOG(Log::System, "XRGB8888 is not supported.\n");
+@@ -1778,6 +1822,7 @@ bool retro_serialize(void *data, size_t size) {
+       EmuThreadPause(); // Does nothing if already paused
+    }
+ 
++   CoreTiming::DuoSetClockFloorHz(0);
+    size_t measuredSize;
+    SaveState::SaveStart state;
+    auto err = CChunkFileReader::MeasureAndSavePtr(state, (u8 **)&data, &measuredSize);
+@@ -1805,6 +1850,7 @@ bool retro_unserialize(const void *data, size_t size) {
+    if (useEmuThread)
+       EmuThreadPause(); // Does nothing if already paused
+ 
++   CoreTiming::DuoSetClockFloorHz(0);
+    std::string errorString;
+    SaveState::SaveStart state;
+    bool retVal = CChunkFileReader::LoadPtr((u8 *)data, size, state, &errorString)
+diff --git a/libretro/libretro.osx.def b/libretro/libretro.osx.def
+index 53a556a..4b66a24 100644
+--- a/libretro/libretro.osx.def
++++ b/libretro/libretro.osx.def
+@@ -25,3 +25,9 @@ _retro_unload_game
+ _retro_get_region
+ _retro_get_memory_data
+ _retro_get_memory_size
++
++_retro_duo_set_high_frame_rate
++_retro_duo_display_counters
++_retro_duo_clock_status
++
++_retro_duo_disable_antialias

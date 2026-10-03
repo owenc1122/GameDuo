@@ -1,0 +1,45 @@
+diff --git a/desmume/src/frontend/libretro/Makefile.libretro b/desmume/src/frontend/libretro/Makefile.libretro
+index 9559212..a0f40d3 100644
+--- a/desmume/src/frontend/libretro/Makefile.libretro
++++ b/desmume/src/frontend/libretro/Makefile.libretro
+@@ -219,7 +219,11 @@ else ifneq (,$(findstring ios,$(platform)))
+       IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
+    endif
+ 
+-   ifeq ($(platform),ios-arm64)
++   ifeq ($(platform),ios-simulator-arm64)
++      IOSSDK := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
++      CC = clang -arch arm64 -target arm64-apple-ios17.0-simulator -isysroot $(IOSSDK)
++      CXX = clang++ -arch arm64 -target arm64-apple-ios17.0-simulator -isysroot $(IOSSDK)
++   else ifeq ($(platform),ios-arm64)
+       CC = clang -arch arm64 -isysroot $(IOSSDK)
+       CXX = clang++ -arch arm64 -isysroot $(IOSSDK)
+    else
+@@ -230,7 +234,10 @@ else ifneq (,$(findstring ios,$(platform)))
+    CXXFLAGS = -DUSE_POSIX_MEMALIGN -D__RETRO_ARM__ -DAPPLE_ATOMICS -D__IOS__
+    fpic := -fPIC
+    SHARED := -dynamiclib
+-   ifeq ($(platform),$(filter $(platform),ios9 ios-arm64))
++   ifeq ($(platform),ios-simulator-arm64)
++      CFLAGS   += -mios-simulator-version-min=17.0
++      CXXFLAGS += -mios-simulator-version-min=17.0
++   else ifeq ($(platform),$(filter $(platform),ios9 ios-arm64))
+       CC       += -miphoneos-version-min=8.0
+       CXX      += -miphoneos-version-min=8.0
+       CFLAGS   += -miphoneos-version-min=8.0
+diff --git a/desmume/src/frontend/libretro/libretro.cpp b/desmume/src/frontend/libretro/libretro.cpp
+index 2314af9..5864b4c 100644
+--- a/desmume/src/frontend/libretro/libretro.cpp
++++ b/desmume/src/frontend/libretro/libretro.cpp
+@@ -1510,6 +1510,11 @@ void retro_init (void)
+ 
+     check_variables(true);
+ 
++    // Advanced SPU capture is known to introduce random crackling in music.
++    // Duo does not need its reverb/capture path, so keep the native mixer on
++    // the stable path while leaving PCM samples otherwise untouched.
++    CommonSettings.spu_advanced = false;
++
+     // Init DeSmuME
+     NDS_SetupDefaultFirmware();
+     CommonSettings.fwConfig.language = firmwareLanguage;

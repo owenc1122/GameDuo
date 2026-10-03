@@ -1,0 +1,63 @@
+diff --git a/libretro/libretro.c b/libretro/libretro.c
+index 5394a3d..613c21c 100644
+--- a/libretro/libretro.c
++++ b/libretro/libretro.c
+@@ -2806,6 +2806,8 @@ static void format_saved_memory(void)
+ 
+ bool retro_load_game(const struct retro_game_info *game)
+ {
++   g_real_stop = 0;
++   g_rsp_force_halt = 0;
+    format_saved_memory();
+ 
+    update_variables(true);
+diff --git a/mupen64plus-core/src/device/r4300/r4300_core.c b/mupen64plus-core/src/device/r4300/r4300_core.c
+index fd02929..0c622e6 100644
+--- a/mupen64plus-core/src/device/r4300/r4300_core.c
++++ b/mupen64plus-core/src/device/r4300/r4300_core.c
+@@ -131,7 +131,8 @@ void run_r4300(struct r4300_core* r4300)
+     _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_OFF);
+ #endif
+ 
+-    *r4300_stop(r4300) = 0;
++    extern int g_rsp_force_halt;
++    *r4300_stop(r4300) = g_rsp_force_halt ? 1 : 0;
+ 
+     /* clear instruction counters */
+ #if defined(COUNT_INSTR)
+diff --git a/mupen64plus-core/src/main/main.c b/mupen64plus-core/src/main/main.c
+index 27b0037..dc0d1f4 100644
+--- a/mupen64plus-core/src/main/main.c
++++ b/mupen64plus-core/src/main/main.c
+@@ -780,6 +780,12 @@ m64p_error main_run(void)
+      * with controller/pak messages once per frame and redundantly reinitializing
+      * everything). The re-entry path only touches globals, so it is safe here. */
+     if (l_setup_done) {
++        extern int g_rsp_force_halt;
++        if (g_rsp_force_halt) {
++            *r4300_stop(&g_dev.r4300) = 1;
++            run_device(&g_dev);
++            goto teardown;
++        }
+         /* Clear the per-frame yield flag and run a slice (run_device returns
+          * when retro_return sets mupencorestop again). Clear the active
+          * backend's stop via the accessor (ari64 keeps it in
+@@ -792,9 +798,8 @@ m64p_error main_run(void)
+          * retro_return from arming the next frame-break. The hot-state stop only
+          * exists when the ari64 dynarec is compiled in (NEW_DYNAREC); without it
+          * there is no separate ari64 stop and *r4300_stop() above is sufficient. */
+-#ifdef NEW_DYNAREC
++        /* arm64 also aliases mupencorestop to hot state in interpreter-only builds. */
+         g_dev.r4300.new_dynarec_hot_state.stop = 0;
+-#endif
+         run_device(&g_dev);
+         return M64ERR_SUCCESS;
+     }
+@@ -1122,6 +1127,7 @@ m64p_error main_run(void)
+     if (frame_break)
+         return M64ERR_SUCCESS;
+ 
++teardown:
+     /* Genuine stop: allow the one-time setup to run again for the next ROM. */
+     l_setup_done = 0;
+ 

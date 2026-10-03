@@ -1,0 +1,97 @@
+diff --git a/src/citra_libretro/citra_libretro.cpp b/src/citra_libretro/citra_libretro.cpp
+index 8a65f9d..df6f40a 100644
+--- a/src/citra_libretro/citra_libretro.cpp
++++ b/src/citra_libretro/citra_libretro.cpp
+@@ -42,12 +42,16 @@
+ #include "common/settings.h"
+ #include "common/string_util.h"
+ #include "core/core.h"
++#include "core/hle/kernel/kernel.h"
+ #include "core/frontend/applets/default_applets.h"
+ #include "core/frontend/image_interface.h"
+ #include "core/hle/kernel/kernel.h"
+ #include "core/hle/kernel/memory.h"
+ #include "core/hle/kernel/process.h"
+ #include "core/loader/loader.h"
++#include "common/file_derived.h"
++#include "core/file_sys/cia_container.h"
++#include "core/hle/service/am/am.h"
+ #include "core/memory.h"
+ 
+ #ifdef HAVE_LIBRETRO_VFS
+@@ -287,6 +291,15 @@ void retro_run() {
+     while (!emu_instance->emu_window->HasSubmittedFrame()) {
+         auto result = Core::System::GetInstance().RunLoop();
+ 
++        // A standalone homebrew may terminate its last process without rebooting.
++        // Notify the frontend instead of presenting cleared screens indefinitely.
++        auto& system = Core::System::GetInstance();
++        if (!system.IsPoweredOn() || system.Kernel().GetProcessList().empty()) {
++            emu_instance->game_loaded = false;
++            LibRetro::Shutdown();
++            return;
++        }
++
+         if (result != Core::System::ResultStatus::Success) {
+             std::string errorContent = Core::System::GetInstance().GetStatusDetails();
+             std::string msg;
+@@ -500,6 +513,36 @@ void retro_reset() {
+ /**
+  * libretro callback; Called when a game is to be loaded.
+  */
++// DuoDS frontend API. Called on its serial emulation queue with no game running.
++extern "C" __attribute__((visibility("default"))) int duo_install_cia(
++    const char* path, char* installed_path, size_t capacity, uint64_t* title_id) {
++    UpdateSettings();
++    bool compressed = false;
++    auto status = Service::AM::CheckCIAToInstall(path, compressed, true);
++    if (status != Service::AM::InstallStatus::Success) return static_cast<int>(status);
++    std::unique_ptr<FileUtil::IOFileBase> file = std::make_unique<FileUtil::IOFile>(path, "rb");
++    if (compressed) file = std::make_unique<FileUtil::Z3DSReadIOFile>(std::move(file));
++    FileSys::CIAContainer container;
++    if (container.Load(file.get()) != Loader::ResultStatus::Success) return 4;
++    const auto& tmd = container.GetTitleMetadata();
++    *title_id = tmd.GetTitleID();
++    // System titles require the console's system-data setup, never an accidental game import.
++    const auto category = *title_id >> 32;
++    if (category != 0x00040000 && category != 0x0004000e && category != 0x0004008c) return 6;
++    status = Service::AM::InstallCIA(path);
++    if (status != Service::AM::InstallStatus::Success) return static_cast<int>(status);
++    installed_path[0] = 0;
++    if (category == 0x00040000) {
++        size_t boot = 0;
++        for (size_t i = 0; i < tmd.GetContentCount(); ++i)
++            if (tmd.GetContentIDByIndex(i) == tmd.GetBootContentID()) boot = i;
++        const auto result = Service::AM::GetTitleContentPath(Service::AM::GetTitleMediaType(*title_id), *title_id, boot);
++        if (!FileUtil::Exists(result) || result.size() >= capacity) return 4;
++        snprintf(installed_path, capacity, "%s", result.c_str());
++    }
++    return 0;
++}
++
+ bool retro_load_game(const struct retro_game_info* info) {
+     LOG_INFO(Frontend, "Starting Azahar RetroArch game...");
+ 
+diff --git a/src/citra_libretro/libretro.osx.def b/src/citra_libretro/libretro.osx.def
+index 53a556a..7d874c9 100644
+--- a/src/citra_libretro/libretro.osx.def
++++ b/src/citra_libretro/libretro.osx.def
+@@ -25,3 +25,4 @@ _retro_unload_game
+ _retro_get_region
+ _retro_get_memory_data
+ _retro_get_memory_size
++_duo_install_cia
+diff --git a/src/core/hle/service/am/am.cpp b/src/core/hle/service/am/am.cpp
+index 9581817..c38f631 100644
+--- a/src/core/hle/service/am/am.cpp
++++ b/src/core/hle/service/am/am.cpp
+@@ -1089,7 +1089,8 @@ InstallStatus InstallCIA(const std::string& path,
+         auto file_size = in_file->GetSize();
+         std::size_t total_bytes_read = 0;
+         while (total_bytes_read != file_size) {
+-            std::size_t bytes_read = in_file->ReadBytes(buffer.data(), buffer.size());
++            std::size_t bytes_read = in_file->ReadBytes(buffer.data(), std::min<u64>(buffer.size(), file_size - total_bytes_read));
++            if (bytes_read == 0) return InstallStatus::ErrorInvalid;
+             auto result = installFile.Write(static_cast<u64>(total_bytes_read), bytes_read, true,
+                                             false, static_cast<u8*>(buffer.data()));
+ 
