@@ -1121,12 +1121,12 @@ private struct CartridgeTutorialView: View {
 
     private static let examples: [GameLibraryItem] = [
         GameLibraryItem(url: URL(string: "duo-tutorial://cards/example-ds.nds")!,
-                        title: "Nintendo DS", detail: "",
+                        title: String(localized: "DS 示例"), detail: "",
                         platform: .nds, cartridgeKind: .ndsStandard,
                         icon: UIImage(systemName: "rectangle.split.2x1"), isBundledTest: false,
                         programID: nil, productID: nil),
         GameLibraryItem(url: URL(string: "duo-tutorial://cards/example-3ds.3dsx")!,
-                        title: "Nintendo 3DS", detail: "",
+                        title: String(localized: "3DS 示例"), detail: "",
                         platform: .threeDS, cartridgeKind: .threeDS,
                         icon: UIImage(systemName: "square.stack.3d.up"), isBundledTest: false,
                         programID: nil, productID: nil)
@@ -1301,9 +1301,9 @@ private struct CartridgeTutorialView: View {
                                 HStack(spacing: 14) {
                                     Image(systemName: "doc").font(.title2).foregroundStyle(accent)
                                     VStack(alignment: .leading, spacing: 5) {
-                                        Text(index == 0 ? "Nintendo DS.nds" : "Nintendo 3DS.3dsx")
+                                        Text(index == 0 ? "DS Demo.nds" : "3DS Demo.3dsx")
                                             .font(.system(size: 18, weight: .semibold))
-                                        Text(index == 0 ? "Nintendo DS" : "Nintendo 3DS")
+                                        Text(index == 0 ? String(localized: "DS 示例") : String(localized: "3DS 示例"))
                                             .font(.caption).foregroundStyle(.secondary)
                                     }
                                     Spacer()

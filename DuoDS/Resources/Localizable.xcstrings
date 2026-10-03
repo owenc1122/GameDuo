@@ -139,6 +139,29 @@
         }
       }
     },
+    "3DS 示例" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3DS Demo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3DS 示例"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3DS 示例"
+          }
+        }
+      }
+    },
     "3DS 虚拟 SD 中已有相同路径的数据，现有文件已保留" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -250,6 +273,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DS 畫面模式"
+          }
+        }
+      }
+    },
+    "DS 示例" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DS Demo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DS 示例"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DS 示例"
           }
         }
       }
