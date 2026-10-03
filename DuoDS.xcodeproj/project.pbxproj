@@ -73,7 +73,7 @@
 		E2E20C1DAE56B4512375E7EE /* PS2Audio in Resources */ = {isa = PBXBuildFile; fileRef = E2E241E044D0A0182E2C0916 /* PS2Audio */; };
 		BF6D91C3828F48E7841F3E88 /* HandheldCaseStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F32B4C0BE7842BAA4697CB0 /* HandheldCaseStage.swift */; };
 		18CD2C79DF324DA4B97D303F /* HandheldCaseCoverArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15DB782F6C574BAB96188155 /* HandheldCaseCoverArt.swift */; };
-		7E5AFE000000000000000001 /* ReviewSafeGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E5AFE000000000000000002 /* ReviewSafeGames.swift */; };
+		7E5AFE000000000000000001 /* NeutralBranding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E5AFE000000000000000002 /* NeutralBranding.swift */; };
 		3A7AE9FC3C6C4FF9A98864B2 /* NDS-Case.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 8372CCEBD99B4C8587D62528 /* NDS-Case.usdz */; };
 		789150BD422442E5B40198D9 /* 3DS-Case.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 140F82793A464E50B717B59A /* 3DS-Case.usdz */; };
 		C94DFBEF195147A28BEF7549 /* PSP-UMD-Case.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 726EC1EA161A4AC5A191800D /* PSP-UMD-Case.usdz */; };
@@ -169,7 +169,7 @@ D00D20000000000000000103 = {isa = PBXFileReference; lastKnownFileType = sourceco
 		E2E241E044D0A0182E2C0916 /* PS2Audio */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "DuoDS/Resources/PS2Audio"; sourceTree = SOURCE_ROOT; };
 		1F32B4C0BE7842BAA4697CB0 /* HandheldCaseStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DuoDS/App/Cases/HandheldCaseStage.swift"; sourceTree = SOURCE_ROOT; };
 		15DB782F6C574BAB96188155 /* HandheldCaseCoverArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DuoDS/App/Cases/Core/HandheldCaseCoverArt.swift"; sourceTree = SOURCE_ROOT; };
-		7E5AFE000000000000000002 /* ReviewSafeGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DuoDS/App/ReviewSafeGames.swift"; sourceTree = SOURCE_ROOT; };
+		7E5AFE000000000000000002 /* NeutralBranding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DuoDS/App/NeutralBranding.swift"; sourceTree = SOURCE_ROOT; };
 		8372CCEBD99B4C8587D62528 /* NDS-Case.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = "DuoDS/Resources/NDS-Case.usdz"; sourceTree = SOURCE_ROOT; };
 		140F82793A464E50B717B59A /* 3DS-Case.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = "DuoDS/Resources/3DS-Case.usdz"; sourceTree = SOURCE_ROOT; };
 		726EC1EA161A4AC5A191800D /* PSP-UMD-Case.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = "DuoDS/Resources/PSP-UMD-Case.usdz"; sourceTree = SOURCE_ROOT; };
@@ -441,7 +441,7 @@ D00D20000000000000000203,
 				E2E29B79C715AC00878C136E /* PS2CaseStage.swift in Sources */,
 				BF6D91C3828F48E7841F3E88 /* HandheldCaseStage.swift in Sources */,
 				18CD2C79DF324DA4B97D303F /* HandheldCaseCoverArt.swift in Sources */,
-				7E5AFE000000000000000001 /* ReviewSafeGames.swift in Sources */,
+				7E5AFE000000000000000001 /* NeutralBranding.swift in Sources */,
 				E2E23468A5B0FF781CC094D9 /* PS2InsertionStage.swift in Sources */,
 				E2E229D3CE54FB54FEFB29BA /* PS2GameView.swift in Sources */,
 				E2E2C1F75AE14547671081B3 /* PS2ControllerView.swift in Sources */,

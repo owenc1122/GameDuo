@@ -1443,7 +1443,7 @@ private struct EmulatorView: View {
             if game.platform == .ps2 {
                 PS2GameView(session: nil, game: game, title: game.title, cover: game.icon?.cgImage, onExitRequested: onExit)
             } else if session.isPSP {
-                PSPGameView(session: session, onExit: onExit, reviewSafe: ReviewSafeGames.isReviewSafe(game))
+                PSPGameView(session: session, onExit: onExit)
             } else if session.isN64 {
                 N64GameView(session: session, onExit: onExit)
             } else if let topImage = session.topImage, let bottomImage = session.bottomImage {
@@ -3067,12 +3067,10 @@ private struct PSP2000SceneView: UIViewRepresentable {
     let controlsLocked: Bool
     let onExit: () -> Void
     var onControl: ((String) -> Void)? = nil
-    /// App Review test game (`ReviewSafeGames`): no SONY / PlayStation / PSP / UMD prints.
-    var reviewSafe = false
 
     func makeUIView(context: Context) -> SCNView {
         let view = PSP2000InteractiveSCNView(frame: .zero)
-        ReviewSafeScene.applyConsole(reviewSafe, to: model.scene.rootNode)
+        NeutralBranding.applyConsole(to: model.scene.rootNode)
         view.scene = model.scene
         view.pointOfView = model.cameraNode
         view.runtimeModel = model
@@ -3695,7 +3693,6 @@ private final class PSP2000InteractiveSCNView: SCNView {
 private struct PSPGameView: View {
     @ObservedObject var session: EmulatorSession
     let onExit: () -> Void
-    var reviewSafe = false
     @State private var controlsLocked = false
     @StateObject private var model = PSP2000RuntimeModel()
 
@@ -3715,8 +3712,7 @@ private struct PSPGameView: View {
                         image: session.pspUsesSharedBuffer ? nil : session.topImage,
                         session: session,
                         controlsLocked: controlsLocked,
-                        onExit: onExit,
-                        reviewSafe: reviewSafe
+                        onExit: onExit
                     )
                         .accessibilityLabel(String(localized: "PSP-2000 银色实体操作界面"))
                     PSPModelIndicatorDriver(

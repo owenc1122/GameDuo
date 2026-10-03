@@ -515,10 +515,8 @@ struct DragCartridgeSceneView: UIViewRepresentable {
             let isPSP = owner.games.indices.contains(selection) && owner.games[selection].platform == .psp
             let isPS2 = owner.games.indices.contains(selection) && owner.games[selection].platform == .ps2
             let caseStage = handheldCase
-            // App Review test games (ReviewSafeGames) show the consoles without brand prints.
-            let reviewSafe = owner.games.indices.contains(selection) && ReviewSafeGames.isReviewSafe(owner.games[selection])
-            ReviewSafeScene.applyConsole(reviewSafe, to: console)
-            ReviewSafeScene.applyConsole(reviewSafe, to: pspConsole)
+            NeutralBranding.applyConsole(to: console)
+            NeutralBranding.applyConsole(to: pspConsole)
             // Fit the whole PSP, including the shoulder buttons, inside this viewport.
             let pspScale = min(Float(stageWidth / size.height) * fullHeight * 0.94 / 0.1694, 100)
             pspConsole.scale = SCNVector3(pspScale, pspScale, pspScale)
@@ -955,8 +953,8 @@ struct DragCartridgeSceneView: UIViewRepresentable {
                 for node in handoff.nodes { pspConsole.addChildNode(node) }
                 for node in handoff.lights { scene.rootNode.addChildNode(node) }
                 pspLid = pspConsole.childNode(withName: "UMD_LID", recursively: true)
-                // The game's own console nodes arrive with that game's review-safe state.
-                ReviewSafeScene.invalidate(pspConsole)
+                // The handed-off nodes have not been neutralised by this scene yet.
+                NeutralBranding.invalidate(pspConsole)
                 pspShutdownHandoff = handoff
                 PSPShutdownHandoff.take = nil
                 SCNTransaction.commit()

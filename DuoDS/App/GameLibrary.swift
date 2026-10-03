@@ -12,6 +12,17 @@ enum GamePlatform: String, Codable, Hashable {
     case n64 = "Nintendo 64"
     case psp = "Sony PSP"
     case ps2 = "Sony PS2"
+
+    /// Library label. The raw value is persisted, so the UI never shows it (no maker names).
+    var displayName: String {
+        switch self {
+        case .nds: "DS"
+        case .threeDS: "3DS"
+        case .n64: "N64"
+        case .psp: "PSP"
+        case .ps2: "PS2"
+        }
+    }
     static let ndsROMExtensions = ROMFiles.nds
     static let threeDSROMExtensions = ROMFiles.threeDS
     static let threeDSInstallableExtensions = ROMFiles.packages
@@ -61,16 +72,6 @@ enum GameCardKind {
         case .threeDS: return "threeDS"
         case .umd: return "umd"
         case .ps2Case: return "ps2Case"
-        }
-    }
-
-    var brand: String {
-        switch self {
-        case .ndsStandard, .ndsInfrared, .dsiEnhanced: return "NINTENDO DS"
-        case .dsiExclusive: return "NINTENDO DSi"
-        case .threeDS: return "NINTENDO 3DS"
-        case .umd: return "UNIVERSAL MEDIA DISC"
-        case .ps2Case: return "PlayStation 2"
         }
     }
 
@@ -135,9 +136,10 @@ struct GameLibraryItem: Identifiable {
 }
 
 enum PS2LibrarySettings {
-    /// Missing covers are always downloaded by serial (front: xlenore/ps2-covers; back: OPL art
-    /// database); there is no setting for it.
-    static let onlineCoversEnabled = true
+    /// Retail cover scans are third-party artwork, so nothing is downloaded: covers come from the
+    /// user's own files next to the game, otherwise the generated label is used. Also gates the
+    /// DS / 3DS / PSP box-art lookup.
+    static let onlineCoversEnabled = false
 }
 
 /// Retail cases in the library, all platforms (`UserDefaults.standard`; bind with
@@ -301,22 +303,6 @@ final class GameLibraryStore: ObservableObject {
         }
         requestPS2Covers()
         requestHandheldCaseArt()
-        refreshReviewSafety()
-    }
-
-    // MARK: Review-safe test games
-
-    /// Hashes the library files that could be App Review test games (`ReviewSafeGames`) off the
-    /// main thread; a card whose answer changed is rebuilt.
-    private func refreshReviewSafety() {
-        let urls = games.map(\.url)
-        Task { [weak self] in
-            let changed = await ReviewSafeGames.warmUp(urls)
-            guard let self, !changed.isEmpty else { return }
-            for index in games.indices where changed.contains(games[index].id) {
-                games[index].appearanceRevision = UUID()
-            }
-        }
     }
 
     // MARK: PS2 covers
@@ -1638,8 +1624,7 @@ struct GameLibraryView: View {
                             .opacity(tapToOpen ? 0 : 1)
                             .padding(.bottom, 1)
                     }
-                    // App Review test games name no console maker (ReviewSafeGames).
-                    Text((ReviewSafeGames.isReviewSafe(game) ? String(localized: "开源测试游戏") : game.platform.rawValue).uppercased())
+                    Text(game.platform.displayName.uppercased())
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .tracking(2)
                         .foregroundStyle(Color(red: 0.64, green: 0.77, blue: 0.81))
@@ -1856,8 +1841,7 @@ enum CartridgeSceneFactory {
         let medium = mediumScene(for: game).rootNode.childNode(withName: "cartridgeModel", recursively: true)
         medium?.removeFromParentNode()
         guard let caseNode = HandheldCaseAssets.makeCase(kind, insert: handheldInsertTexture(for: game),
-                                                         medium: medium,
-                                                         reviewSafe: ReviewSafeGames.isReviewSafe(game)) else { return nil }
+                                                         medium: medium) else { return nil }
         let scene = SCNScene()
         scene.rootNode.name = game.id
         let model = SCNNode()
@@ -1883,11 +1867,10 @@ enum CartridgeSceneFactory {
         model.eulerAngles = SCNVector3(-0.07, -0.10, 0)
         scene.rootNode.addChildNode(model)
 
-        let reviewSafe = ReviewSafeGames.isReviewSafe(game)
         let detailed = detailedModels?.rootNode.childNode(withName: game.cartridgeKind.modelNodeName, recursively: true)?.clone()
         if let detailed {
             detailed.position = SCNVector3Zero
-            if reviewSafe { ReviewSafeScene.hideTrademarkNodes(in: detailed) }
+            NeutralBranding.hideTrademarkNodes(in: detailed)
             model.addChildNode(detailed)
         } else {
         let shellPath = silhouette(for: game.cartridgeKind)
@@ -1899,8 +1882,7 @@ enum CartridgeSceneFactory {
         shellNode.name = "cartridgeShell"
         shellNode.position.z = -1.9
         model.addChildNode(shellNode)
-        if !reviewSafe { addEmbossedMark(to: model, kind: game.cartridgeKind) }
-        addBackContacts(to: model, kind: game.cartridgeKind, markings: !reviewSafe)
+        addBackContacts(to: model, kind: game.cartridgeKind)
         }
 
         if let color = game.shellColor {
@@ -2125,7 +2107,7 @@ enum CartridgeSceneFactory {
                 }
             }
             lettering.forEach { filledUMDBadgeLetter($0) }
-            if ReviewSafeGames.isReviewSafe(game) { ReviewSafeScene.hideTrademarkNodes(in: source) }
+            NeutralBranding.hideTrademarkNodes(in: source)
             model.addChildNode(source)
         } else {
             let shell = SCNCylinder(radius: 31.8, height: 4.2)
@@ -2473,21 +2455,6 @@ enum CartridgeSceneFactory {
         return [front, side, front, side, side]
     }
 
-    private static func addEmbossedMark(to model: SCNNode, kind: GameCardKind) {
-        let text = SCNText(string: kind.brand, extrusionDepth: 0.035)
-        text.font = UIFont.systemFont(ofSize: 1.45, weight: .bold)
-        text.flatness = 0.15
-        let material = SCNMaterial()
-        material.diffuse.contents = (kind == .threeDS || kind == .dsiExclusive) ? UIColor(white: 0.34, alpha: 1) : UIColor(white: 0.36, alpha: 1)
-        text.materials = [material]
-        let node = SCNNode(geometry: text)
-        let bounds = node.boundingBox
-        let width = bounds.max.x - bounds.min.x
-        node.position = SCNVector3(-width / 2, 13.9, 0.04)
-        node.scale = SCNVector3(1, 1, 1)
-        model.addChildNode(node)
-    }
-
     private static func addInsetGameTitle(to model: SCNNode, game: GameLibraryItem) {
         let titlePlate = SCNPlane(width: 25.8, height: 3.65)
         let material = SCNMaterial()
@@ -2582,8 +2549,7 @@ enum CartridgeSceneFactory {
         return UIFont.systemFont(ofSize: size, weight: .semibold)
     }
 
-    /// `markings` false leaves out the moulded brand and model number (review-safe test games).
-    private static func addBackContacts(to model: SCNNode, kind: GameCardKind, markings: Bool = true) {
+    private static func addBackContacts(to model: SCNNode, kind: GameCardKind) {
         let isLightShell = kind == .threeDS || kind == .dsiExclusive || kind == .umd
 
         let contactBed = SCNBox(width: 27.2, height: 11.4, length: 0.12, chamferRadius: 0.65)
@@ -2622,30 +2588,6 @@ enum CartridgeSceneFactory {
             ribNode.position = SCNVector3(start - spacing / 2 + Float(index) * spacing, -9.35, -4.01)
             model.addChildNode(ribNode)
         }
-        guard markings else { return }
-
-        let moldedText = SCNText(string: kind.brand, extrusionDepth: 0.018)
-        moldedText.font = UIFont.systemFont(ofSize: 1.35, weight: .semibold)
-        moldedText.flatness = 0.12
-        let textMaterial = SCNMaterial()
-        textMaterial.diffuse.contents = UIColor(white: isLightShell ? 0.43 : 0.10, alpha: 1)
-        textMaterial.roughness.contents = 0.82
-        moldedText.materials = [textMaterial]
-        let textNode = SCNNode(geometry: moldedText)
-        let bounds = textNode.boundingBox
-        textNode.position = SCNVector3((bounds.max.x - bounds.min.x) / 2, 12.7, -3.84)
-        textNode.eulerAngles.y = .pi
-        model.addChildNode(textNode)
-
-        let code = SCNText(string: kind == .threeDS ? "CTR-005" : kind == .umd ? "UMD" : "NTR-005", extrusionDepth: 0.012)
-        code.font = UIFont.monospacedSystemFont(ofSize: 0.82, weight: .medium)
-        code.flatness = 0.12
-        code.materials = [textMaterial]
-        let codeNode = SCNNode(geometry: code)
-        let codeBounds = codeNode.boundingBox
-        codeNode.position = SCNVector3((codeBounds.max.x - codeBounds.min.x) / 2, 9.9, -3.84)
-        codeNode.eulerAngles.y = .pi
-        model.addChildNode(codeNode)
     }
 
     static func labelTexture(for game: GameLibraryItem) -> UIImage {
