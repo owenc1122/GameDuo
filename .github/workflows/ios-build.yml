@@ -9,9 +9,14 @@
 # mode=simulator  Debug build for the simulator, .app uploaded for comparison screenshots
 # mode=archive    signed App Store archive + IPA via the ASC API key (secrets ASC_KEY_ID,
 #                 ASC_ISSUER_ID, ASC_KEY_P8); upload=true also sends it to App Store Connect
+#
+# workflow_dispatch only sees workflows on the default branch, so from other branches push a tag:
+#   git tag ci-compile-1 && git push origin ci-compile-1    (ci-sim-*, ci-archive-* likewise; never uploads)
 name: ios-build
 
 on:
+  push:
+    tags: ['ci-compile-*', 'ci-sim-*', 'ci-archive-*']
   workflow_dispatch:
     inputs:
       mode:
@@ -24,7 +29,7 @@ on:
         default: false
 
 concurrency:
-  group: ios-build-${{ github.ref }}
+  group: ios-build
   cancel-in-progress: true
 
 permissions:
@@ -35,6 +40,7 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 60
     env:
+      MODE: ${{ inputs.mode || (startsWith(github.ref_name, 'ci-archive-') && 'archive') || (startsWith(github.ref_name, 'ci-sim-') && 'simulator') || 'compile' }}
       STORE_XCODE: /Applications/Xcode_27.0.app
       SIM_XCODE: /Applications/Xcode_27.1.app
     steps:
@@ -80,7 +86,7 @@ jobs:
           fi
 
       - name: Release build (unsigned)
-        if: inputs.mode == 'compile'
+        if: env.MODE == 'compile'
         run: |
           set -euo pipefail
           sudo xcode-select -s "$STORE_XCODE"
@@ -102,7 +108,7 @@ jobs:
           } | tee "$RUNNER_TEMP/release-checks.txt"
 
       - name: Simulator build (Debug)
-        if: inputs.mode == 'simulator'
+        if: env.MODE == 'simulator'
         run: |
           set -euo pipefail
           sudo xcode-select -s "$SIM_XCODE"
@@ -111,7 +117,7 @@ jobs:
           (cd "$RUNNER_TEMP/build/Debug-iphonesimulator" && zip -qry "$RUNNER_TEMP/DuoDS-sim.zip" DuoDS.app)
 
       - name: App Store archive
-        if: inputs.mode == 'archive'
+        if: env.MODE == 'archive'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -125,7 +131,7 @@ jobs:
           xcodebuild -project DuoDS.xcodeproj -scheme DuoDS -configuration Release -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/DuoDS.xcarchive" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Development" \
             PROVISIONING_PROFILE_SPECIFIER= DEVELOPMENT_TEAM=AHVDBX7277 "${AUTH[@]}" archive 2>&1 | tee "$RUNNER_TEMP/build.log"
-          DEST=export; [ "${{ inputs.upload }}" = true ] && DEST=upload
+          DEST=export; [ "${{ inputs.upload || false }}" = true ] && DEST=upload
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -144,7 +150,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: gameduo-${{ inputs.mode }}-${{ github.run_number }}
+          name: gameduo-${{ env.MODE }}-${{ github.run_number }}
           retention-days: 7
           path: |
             ${{ runner.temp }}/build.log
