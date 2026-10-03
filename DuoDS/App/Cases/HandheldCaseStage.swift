@@ -84,7 +84,6 @@ enum HandheldCaseAssets {
 
     /// The closed case, centred on its bounding box and scaled to carousel units, wrapped in a
     /// `HandheldCaseStage.wrapperName` node; `medium` (a library `cartridgeModel`) rests in its holder.
-    /// The moulded brand prints are always hidden (`NeutralBranding`).
     static func makeCase(_ kind: HandheldCaseKind, insert: UIImage, medium: SCNNode?) -> SCNNode? {
         guard let template = template(kind) else { return nil }
         let root = template.root.clone()
@@ -107,8 +106,8 @@ enum HandheldCaseAssets {
             }
             node.geometry = geometry
         }
-        NeutralBranding.hideTrademarkNodes(in: root)
         if root.name == "PS2_CASE" {
+            // Stand-in asset: its PlayStation prints do not belong on a Nintendo / PSP case.
             root.enumerateHierarchy { node, _ in
                 if node.name?.hasPrefix("TRADEMARK_PRINTS") == true { node.isHidden = true }
             }
@@ -207,7 +206,6 @@ extension CartridgeSceneFactory {
     static func handheldInsertTexture(for game: GameLibraryItem) -> UIImage {
         guard let kind = HandheldCaseKind(game: game) ?? fallbackKind(game),
               let template = HandheldCaseAssets.template(kind) else { return UIImage() }
-        // Platform banners are never drawn (`NeutralBranding`).
         let key = "\(game.id)|\(game.appearanceRevision)|\(kind)" as NSString
         if let cached = handheldInsertCache.object(forKey: key) { return cached }
         let platform: HandheldCasePlatform = switch kind {
@@ -225,7 +223,7 @@ extension CartridgeSceneFactory {
         guard let sheet = HandheldCaseInsert.render(
             platform: platform, layout: layout, full: art?.full?.cgImage,
             front: art?.front?.cgImage, back: art?.back?.cgImage,
-            title: game.title, subtitle: nil, pixelsPerMM: 6, neutral: true) else { return UIImage() }
+            title: game.title, subtitle: nil, pixelsPerMM: 6, neutral: false) else { return UIImage() }
         let texture = UIImage(cgImage: sheet)
         handheldInsertCache.setObject(texture, forKey: key)
         return texture
