@@ -8,9 +8,10 @@ DuoDS 的应用层代码是独立实现，不复制 Delta 的界面、皮肤、�
 - [melonDS DS 1.3.1](https://github.com/JesseTG/melonds-ds)：当前实际运行的 DS/DSi libretro 后端，GPL-3.0-or-later。锁定 `bc4e4b67d2d470d7c682810a1e892cafd6f9082b`，上游 melonDS 锁定 `7117178c2dd56df32b6534ba6a54ad1f8547e693`。替换旧版 Delta 桥接的运行路径后，TrailMix 白屏消失。源码与完整许可证保留在 `ThirdParty/melonds-ds`，CMake 依赖版本由上游固定。
 - [ParaLLEl N64](https://github.com/libretro/parallel-n64)：原生 N64 后端，锁定 `6e4c44c51885c8dc16e46d68464c517e6fca6712`。iOS 使用 cached interpreter、Angrylion 软件渲染和 cxd4 RSP，无需 JIT。修复 arm64 逐帧停止标志及切换 ROM 时的缓存清理；补丁保留在 `RuntimeValidation/Formats/patches/parallel-n64-lifecycle.patch`。各组成部分的 GPL/LGPL 等许可证保留在源码树，不能将整体当作宽松许可代码。
 - [libarchive](https://github.com/libarchive/libarchive)：ZIP、7Z、RAR/RAR5 解包，BSD 系列许可。链接 Apple SDK 的 `libarchive`，仅使用公开 API；缺失的公开头文件取自 `abaa707d92fce052f386b6cc2c8d0593ce61e639`。不会用 shell 解压用户文件。
-- [MelonDSDeltaCore](https://github.com/rileytestut/MelonDSDeltaCore)：保留既有工程及输入枚举依赖；当前 DS 游戏通过新版 melonDS DS 运行，不再调用该工程附带的旧模拟器运行桥接。原有上游源码及许可证保留。
-- [DeltaCore](https://github.com/rileytestut/DeltaCore)：用于编译现有 MelonDSDeltaCore 桥接框架的公共协议依赖；正式分发前需要按上游仓库当前的许可证声明复核。
-- [ZIPFoundation](https://github.com/weichsel/ZIPFoundation)：由 DeltaCore 的依赖链使用，MIT 许可。
+- [DeSmuME（libretro）](https://github.com/libretro/desmume)：DS 的 HD 渲染模式后端（2x 超采样光栅化），GPL-2.0-or-later。原画模式仍走 melonDS DS。打包为 `ThirdParty/StoreCores/DeSmuMECore.xcframework`，锁定版本见 vendor-export 分支 `vendor/MANIFEST.tsv`。
+- [PPSSPP](https://github.com/hrydgard/ppsspp)：PSP libretro 后端及运行时资源（`DuoDS/Resources/PPSSPP`），GPL-2.0-or-later。本地加了 `retro_duo_*` 帧率/计数/抗锯齿接口，补丁见 vendor-export 分支。
+- [Play!](https://github.com/jpd002/Play-)：PS2 后端（WebAssembly，`ThirdParty/PlayWeb`），BSD-2-Clause。
+- 已移除（1.0.1）：MelonDSDeltaCore、DeltaCore、ZIPFoundation。输入枚举改为自有的 `DuoInput`（rawValue 与旧枚举一致，已存按键映射不受影响），音频环形缓冲改为自有的 `AudioRingBuffer`。完整第三方清单与许可证见 `THIRD_PARTY_NOTICES.md` 和 `DuoDS/Resources/Licenses/`。
 
 当前锁定的上游源码版本记录在各自 Git checkout 中。更新依赖时，必须重新确认许可证、iOS 构建目标、模拟器架构和接口兼容性，并更新本文件。
 
@@ -39,7 +40,7 @@ DuoDS 的应用层代码是独立实现，不复制 Delta 的界面、皮肤、�
 
 ## 构建边界
 
-运行 `tools/build_azahar_core.sh` 会按 Azahar 官方 CI 参数分别构建 iOS 真机和 arm64 模拟器核心，并生成 `ThirdParty/AzaharCore.xcframework`。随后构建 `DuoDS.xcworkspace`；Xcode 会从 XCFramework 自动选择当前平台，同时继续构建原有的 MelonDSDeltaCore、DeltaCore 和 ZIPFoundation 依赖。
+运行 `tools/build_azahar_core.sh` 会按 Azahar 官方 CI 参数分别构建 iOS 真机和 arm64 模拟器核心，并生成 `ThirdParty/AzaharCore.xcframework`。随后构建 `DuoDS.xcworkspace`；Xcode 会从 XCFramework 自动选择当前平台，工程不再依赖任何额外的 Xcode 子工程。
 
 ## ROM 元数据与 3D 卡带依据
 

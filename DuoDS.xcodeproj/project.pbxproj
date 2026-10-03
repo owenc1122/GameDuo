@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D0D1A0000000000000000002 /* AudioRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D1A0000000000000000012 /* AudioRingBuffer.swift */; };
+		D0D1A0000000000000000001 /* DuoInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D1A0000000000000000011 /* DuoInput.swift */; };
 		E2E2FA23E02C3EF9FCC42962 /* PS2Web in Resources */ = {isa = PBXBuildFile; fileRef = E2E29FFDAEAAC973A111B63F /* PS2Web */; };
 		E2E28E93FD49A4FA09C8C3EA /* PS2WebSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E288F56CD2528AB69F436F /* PS2WebSchemeHandler.swift */; };
 		E2E231B2BD99622A8FC9EFC0 /* PS2WebCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E263D335FB9BA03C82A3B4 /* PS2WebCore.swift */; };
@@ -26,20 +28,14 @@
 		27ADD5341A92E91ED8F992D9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D12503635828B409311C67C /* ContentView.swift */; };
 		A3A3A3A30000000000000007 /* GameLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000018 /* GameLibrary.swift */; };
 		A3A3A3A30000000000000008 /* CartridgeInsertionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000019 /* CartridgeInsertionView.swift */; };
-		2E833945F40D20822044DFFB /* ZIPFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 56AB9BAF8ED5C4981A1C6C15 /* ZIPFoundation.framework */; };
-		2F4FB849EF689B8143217505 /* MelonDSDeltaCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 6378DF3DD4AE97CCDD36FD9C /* MelonDSDeltaCore.framework */; };
 		30E95276221DFB79C04AF86F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0062BF117B28CA5FC457EAC9 /* Foundation.framework */; };
 		825DE0DA39CE14491602441A /* EmulatorSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8AB6A83302A72A024407F5 /* EmulatorSession.swift */; };
 		D0BEEF000000000000000002 /* DuoPro.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0BEEF000000000000000001 /* DuoPro.swift */; };
-		8B8725291399B3A383B91F84 /* DeltaCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 451325081BE0C0B403F2BE9D /* DeltaCore.framework */; };
-		99935F4B632F63796F747C94 /* MelonDSDeltaCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6378DF3DD4AE97CCDD36FD9C /* MelonDSDeltaCore.framework */; };
-		BA916DE8BA15C814204C00FA /* ZIPFoundation.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 56AB9BAF8ED5C4981A1C6C15 /* ZIPFoundation.framework */; };
 		BD2FC4D5F2BE0CFBC49860D5 /* DuoDSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B81AC279A8C037D0ADEEB9 /* DuoDSApp.swift */; };
 		A3A3A3A30000000000000001 /* AzaharCoreBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000011 /* AzaharCoreBridge.mm */; };
 		A3A3A3A30000000000000002 /* AzaharAudioOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000012 /* AzaharAudioOutput.swift */; };
 		A3A3A3A30000000000000003 /* AzaharCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000015 /* AzaharCore.xcframework */; };
 		A3A3A3A30000000000000004 /* AzaharCore.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A3A3A3A30000000000000015 /* AzaharCore.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		F472120A2A82D2561EDA36DB /* DeltaCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 451325081BE0C0B403F2BE9D /* DeltaCore.framework */; };
 		D0A1B2C3D4E5F60718293A4B /* FuzedNeo.nds in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF02 /* FuzedNeo.nds */; };
 		D0A1B2C3D4E5F60718293A52 /* TrailMix.nds in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF09 /* TrailMix.nds */; };
 		D0A1B2C3D4E5F60718293A4C /* Nintendo-3DS-XL-180deg.png in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF03 /* Nintendo-3DS-XL-180deg.png */; };
@@ -96,9 +92,6 @@
 				D00D20000000000000000401,
 				D00D20000000000000000501,
 				D00D20000000000000000601 /* PPSSPPCore.xcframework in Embed Frameworks */,
-				2F4FB849EF689B8143217505 /* MelonDSDeltaCore.framework in Embed Frameworks */,
-				8B8725291399B3A383B91F84 /* DeltaCore.framework in Embed Frameworks */,
-				BA916DE8BA15C814204C00FA /* ZIPFoundation.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -106,6 +99,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D0D1A0000000000000000012 /* AudioRingBuffer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioRingBuffer.swift; sourceTree = "<group>"; };
+		D0D1A0000000000000000011 /* DuoInput.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DuoInput.swift; sourceTree = "<group>"; };
 		E2E29FFDAEAAC973A111B63F /* PS2Web */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "DuoDS/Resources/PS2Web"; sourceTree = SOURCE_ROOT; };
 		E2E288F56CD2528AB69F436F /* PS2WebSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PS2WebSchemeHandler.swift; path = Web/PS2WebSchemeHandler.swift; sourceTree = "<group>"; };
 		E2E263D335FB9BA03C82A3B4 /* PS2WebCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PS2WebCore.swift; path = Web/PS2WebCore.swift; sourceTree = "<group>"; };
@@ -126,12 +121,9 @@
 		3D12503635828B409311C67C /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A3A3A3A30000000000000018 /* GameLibrary.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GameLibrary.swift; path = GameLibrary.swift; sourceTree = "<group>"; };
 		A3A3A3A30000000000000019 /* CartridgeInsertionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CartridgeInsertionView.swift; path = CartridgeInsertionView.swift; sourceTree = "<group>"; };
-		451325081BE0C0B403F2BE9D /* DeltaCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = DeltaCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		56AB9BAF8ED5C4981A1C6C15 /* ZIPFoundation.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = ZIPFoundation.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		5C8AB6A83302A72A024407F5 /* EmulatorSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EmulatorSession.swift; path = EmulatorSession.swift; sourceTree = "<group>"; };
 		D0BEEF000000000000000001 /* DuoPro.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DuoPro.swift; path = DuoPro.swift; sourceTree = "<group>"; };
 		D0BEEF000000000000000003 /* DuoDS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = DuoDS.entitlements; path = DuoDS.entitlements; sourceTree = "<group>"; };
-		6378DF3DD4AE97CCDD36FD9C /* MelonDSDeltaCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = MelonDSDeltaCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		67B81AC279A8C037D0ADEEB9 /* DuoDSApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DuoDSApp.swift; path = DuoDSApp.swift; sourceTree = "<group>"; };
 		A3A3A3A30000000000000011 /* AzaharCoreBridge.mm */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.cpp.objcpp; name = AzaharCoreBridge.mm; path = AzaharCoreBridge.mm; sourceTree = "<group>"; };
 		A3A3A3A30000000000000012 /* AzaharAudioOutput.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AzaharAudioOutput.swift; path = AzaharAudioOutput.swift; sourceTree = "<group>"; };
@@ -191,9 +183,6 @@ D00D20000000000000000103 = {isa = PBXFileReference; lastKnownFileType = sourceco
 			files = (
 				A3A3A3A30000000000000003 /* AzaharCore.xcframework in Frameworks */,
 				30E95276221DFB79C04AF86F /* Foundation.framework in Frameworks */,
-				99935F4B632F63796F747C94 /* MelonDSDeltaCore.framework in Frameworks */,
-				F472120A2A82D2561EDA36DB /* DeltaCore.framework in Frameworks */,
-				2E833945F40D20822044DFFB /* ZIPFoundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -209,9 +198,6 @@ D00D20000000000000000103 = {isa = PBXFileReference; lastKnownFileType = sourceco
 				D00D20000000000000000400,
 				D00D20000000000000000500,
 				D00D20000000000000000600 /* PPSSPPCore.xcframework */,
-				6378DF3DD4AE97CCDD36FD9C /* MelonDSDeltaCore.framework */,
-				451325081BE0C0B403F2BE9D /* DeltaCore.framework */,
-				56AB9BAF8ED5C4981A1C6C15 /* ZIPFoundation.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -235,6 +221,8 @@ D00D20000000000000000103 = {isa = PBXFileReference; lastKnownFileType = sourceco
 				A3A3A3A30000000000000018 /* GameLibrary.swift */,
 				A3A3A3A30000000000000019 /* CartridgeInsertionView.swift */,
 				A3A3A3A30000000000000012 /* AzaharAudioOutput.swift */,
+				D0D1A0000000000000000012 /* AudioRingBuffer.swift */,
+				D0D1A0000000000000000011 /* DuoInput.swift */,
 				A3A3A3A30000000000000013 /* AzaharCoreBridge.h */,
 				A3A3A3A30000000000000011 /* AzaharCoreBridge.mm */,
 D00D20000000000000000103,
@@ -438,6 +426,8 @@ D00D20000000000000000203,
 				D00D20000000000000000201,
 				D00D20000000000000000200,
 				A3A3A3A30000000000000002 /* AzaharAudioOutput.swift in Sources */,
+				D0D1A0000000000000000002 /* AudioRingBuffer.swift in Sources */,
+				D0D1A0000000000000000001 /* DuoInput.swift in Sources */,
 				E2E2D3ED6304CDCFB2E8961A /* PS2Core.swift in Sources */,
 				E2E2AA7215A08A5A5311FF61 /* PS2Disc.swift in Sources */,
 				E2E2B5952BD747EB3C56111D /* PS2CoverArt.swift in Sources */,
@@ -486,12 +476,6 @@ D00D20000000000000000203,
 				OTHER_LDFLAGS = (
                     "-larchive",
 					"$(inherited)",
-					"-framework",
-					MelonDSDeltaCore,
-					"-framework",
-					DeltaCore,
-					"-framework",
-					ZIPFoundation,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.duods.app;
 				SDKROOT = iphoneos;
@@ -572,12 +556,6 @@ D00D20000000000000000203,
 				OTHER_LDFLAGS = (
                     "-larchive",
 					"$(inherited)",
-					"-framework",
-					MelonDSDeltaCore,
-					"-framework",
-					DeltaCore,
-					"-framework",
-					ZIPFoundation,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.duods.app;
 				SDKROOT = iphoneos;

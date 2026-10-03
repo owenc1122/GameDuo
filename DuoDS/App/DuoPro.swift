@@ -3,7 +3,6 @@ import CryptoKit
 import StoreKit
 import SwiftUI
 import UIKit
-import MelonDSDeltaCore
 
 enum DuoScreenLayout: String, Codable, CaseIterable, Identifiable {
     case console, stacked, sideBySide, topOnly, bottomOnly, pictureInPicture
@@ -849,7 +848,7 @@ private struct DuoCompactControls: View {
             }.padding(24)
         }
     }
-    private func button(_ title: String, _ input: MelonDSGameInput) -> some View {
+    private func button(_ title: String, _ input: DuoInput) -> some View {
         Text(title).font(.headline).frame(width: 44, height: 44).background(.black.opacity(0.55), in: Circle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { _ in session.press(input) }.onEnded { _ in session.release(input) })
     }

@@ -4,7 +4,4 @@
    <FileRef
       location = "group:DuoDS.xcodeproj">
    </FileRef>
-   <FileRef
-      location = "group:ThirdParty/MelonDSDeltaCore/MelonDSDeltaCore.xcodeproj">
-   </FileRef>
 </Workspace>

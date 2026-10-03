@@ -8,6 +8,7 @@ The machine-readable list is `DuoDS/Resources/Licenses/OpenSourceLicenses.json`.
 |---|---|---|---|---|
 | melonDS DS | DS core | GPL-3.0-or-later | https://github.com/JesseTG/melonds-ds | bc4e4b67d2d4 |
 | melonDS | DS core (via melonDS DS) | GPL-3.0-or-later | https://github.com/melonDS-emu/melonDS | 7117178c2dd5 |
+| DeSmuME | DS core (HD rendering mode) | GPL-2.0-or-later | https://github.com/libretro/desmume | TODO |
 | Azahar | 3DS core | GPL-2.0-or-later | https://github.com/azahar-emu/azahar | c2237de04d8c |
 | PPSSPP | PSP core + runtime assets | GPL-2.0-or-later | https://github.com/hrydgard/ppsspp | TODO |
 | ParaLLEl N64 | N64 core | GPL-2.0-or-later (mixed GPL/LGPL components) | https://github.com/libretro/parallel-n64 | 6e4c44c51885 |

@@ -1,5 +1,4 @@
 import AVFoundation
-import DeltaCore
 import Foundation
 #if DEBUG
 import Synchronization
@@ -11,7 +10,7 @@ import Synchronization
 final class AzaharAudioOutput {
     private let engine = AVAudioEngine()
     private var sourceNode: AVAudioSourceNode?
-    private var ringBuffer: RingBuffer?
+    private var ringBuffer: AudioRingBuffer?
     private var generation = 0
     private var volume: Float = 1
     private(set) var isRunning = false
@@ -34,7 +33,7 @@ final class AzaharAudioOutput {
             sampleRate: sampleRate,
             channels: 2,
             interleaved: true
-        ), let ringBuffer = RingBuffer(preferredBufferSize: Int(sampleRate * 4)) else { return }
+        ), let ringBuffer = AudioRingBuffer(preferredBufferSize: Int(sampleRate * 4)) else { return }
 
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()

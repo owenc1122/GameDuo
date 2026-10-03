@@ -5,7 +5,6 @@ import UniformTypeIdentifiers
 import PhotosUI
 import MediaPlayer
 import AVFAudio
-import MelonDSDeltaCore
 
 struct ContentView: View {
     @ObservedObject var session: EmulatorSession
@@ -251,7 +250,7 @@ struct ContentView: View {
                         // Exercise the exact short-tap path used by the
                         // on-screen controls. Each input must survive long
                         // enough for the NDS core to observe it.
-                        for input in [MelonDSGameInput.a, .b, .x, .y] {
+                        for input in [DuoInput.a, .b, .x, .y] {
                             session.pressMomentary(input)
                             session.releaseMomentary(input)
                             try? await Task.sleep(for: .milliseconds(180))
@@ -1742,8 +1741,8 @@ private struct ModelControlPatch: View {
 private struct ModelCirclePad: View {
     @ObservedObject var session: EmulatorSession
     @GestureState private var contactActive = false
-    @State private var horizontalInput: MelonDSGameInput?
-    @State private var verticalInput: MelonDSGameInput?
+    @State private var horizontalInput: DuoInput?
+    @State private var verticalInput: DuoInput?
     @State private var knobOffset = CGSize.zero
     @State private var isEngaged = false
     @State private var releaseTask: Task<Void, Never>?
@@ -1829,16 +1828,16 @@ private struct ModelCirclePad: View {
     }
     private func mappedInput(
         rawValue: CGFloat,
-        current: MelonDSGameInput?,
-        positive: MelonDSGameInput,
-        negative: MelonDSGameInput
-    ) -> MelonDSGameInput? {
+        current: DuoInput?,
+        positive: DuoInput,
+        negative: DuoInput
+    ) -> DuoInput? {
         let threshold = current == nil ? engageThreshold : releaseThreshold
         guard abs(rawValue) >= threshold else { return nil }
         return rawValue >= 0 ? positive : negative
     }
 
-    private func updateInput(_ current: inout MelonDSGameInput?, to next: MelonDSGameInput?) {
+    private func updateInput(_ current: inout DuoInput?, to next: DuoInput?) {
         guard current?.rawValue != next?.rawValue else { return }
         if let current { session.release(current) }
         if let next { session.press(next) }
@@ -1865,7 +1864,7 @@ private struct ModelCirclePad: View {
 private struct ModelDPad: View {
     @ObservedObject var session: EmulatorSession
     @GestureState private var contactActive = false
-    @State private var activeInput: MelonDSGameInput?
+    @State private var activeInput: DuoInput?
     @State private var patchName: String?
 
     var body: some View {
@@ -1901,7 +1900,7 @@ private struct ModelDPad: View {
     private func update(with location: CGPoint, in size: CGSize) {
         let dx = location.x - size.width / 2
         let dy = location.y - size.height / 2
-        let next: MelonDSGameInput
+        let next: DuoInput
         let nextPatch: String
 
         if abs(dx) > abs(dy) {
@@ -1929,7 +1928,7 @@ private struct ModelDPad: View {
 
 private struct ModelFaceButtonCluster: View {
     @ObservedObject var session: EmulatorSession
-    @State private var activeInput: MelonDSGameInput?
+    @State private var activeInput: DuoInput?
     @State private var patchName: String?
 
     var body: some View {
@@ -1978,7 +1977,7 @@ private struct ModelFaceButtonCluster: View {
         }!
     }
 
-    private func releaseActiveButton(expected: MelonDSGameInput? = nil) {
+    private func releaseActiveButton(expected: DuoInput? = nil) {
         guard let activeInput else { return }
         guard expected == nil || expected?.rawValue == activeInput.rawValue else { return }
         session.releaseMomentary(activeInput)
@@ -1987,7 +1986,7 @@ private struct ModelFaceButtonCluster: View {
     }
 
     private struct FaceKey: Hashable {
-        let input: MelonDSGameInput
+        let input: DuoInput
         let patchName: String
         let label: String
         let center: CGPoint
@@ -2338,7 +2337,7 @@ private struct ControlDeck: View {
 
 private struct CirclePad: View {
     @ObservedObject var session: EmulatorSession
-    @State private var activeInput: MelonDSGameInput?
+    @State private var activeInput: DuoInput?
 
     var body: some View {
         GeometryReader { proxy in
@@ -2362,7 +2361,7 @@ private struct CirclePad: View {
 
     private func updateDirection(for point: CGPoint, in size: CGSize) {
         let vector = CGSize(width: point.x - size.width / 2, height: point.y - size.height / 2)
-        let next: MelonDSGameInput?
+        let next: DuoInput?
         if max(abs(vector.width), abs(vector.height)) < 12 {
             next = nil
         } else if abs(vector.width) > abs(vector.height) {
@@ -2395,7 +2394,7 @@ private struct DirectionPad: View {
         .frame(width: 104, height: 104)
     }
 
-    private func control(_ input: MelonDSGameInput, systemName: String, offset: CGSize) -> some View {
+    private func control(_ input: DuoInput, systemName: String, offset: CGSize) -> some View {
         PressableButton(systemName: systemName) {
             session.press(input)
         } onRelease: {
@@ -2426,7 +2425,7 @@ private struct ButtonPad: View {
 private struct ShoulderButton: View {
     let label: String
     @ObservedObject var session: EmulatorSession
-    let input: MelonDSGameInput
+    let input: DuoInput
 
     var body: some View {
         PillButton(label: label) { session.press(input) } onRelease: { session.release(input) }

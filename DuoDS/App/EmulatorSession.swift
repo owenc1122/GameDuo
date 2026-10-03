@@ -8,7 +8,6 @@ import CoreImage
 #if !targetEnvironment(simulator)
 import MetalFX
 #endif
-import MelonDSDeltaCore
 
 extension AzaharCoreBridge: @unchecked Sendable {}
 
@@ -555,7 +554,7 @@ final class EmulatorSession: NSObject, ObservableObject {
         measurementStart = now
     }
 
-    func press(_ input: MelonDSGameInput) {
+    func press(_ input: DuoInput) {
         let input = mapped(input)
         guard isRunning, !isPaused, let button = azaharButton(for: input) else { return }
         if runtimeConfiguration.isPro, runtimeConfiguration.preferences.turboButtons.contains(String(input.rawValue)) {
@@ -566,7 +565,7 @@ final class EmulatorSession: NSObject, ObservableObject {
         azaharBridge.setButton(button, pressed: true)
     }
 
-    func release(_ input: MelonDSGameInput) {
+    func release(_ input: DuoInput) {
         let input = mapped(input)
         turboTasks[String(input.rawValue)]?.cancel(); turboTasks[String(input.rawValue)] = nil
         guard backend != nil, let button = azaharButton(for: input) else { return }
@@ -576,7 +575,7 @@ final class EmulatorSession: NSObject, ObservableObject {
     /// Small menu buttons are often tapped down and up between two core input
     /// polls. Keep them asserted for three 60 Hz frames so the game always
     /// observes the press without adding repeat or gameplay latency.
-    func pressMomentary(_ input: MelonDSGameInput) {
+    func pressMomentary(_ input: DuoInput) {
         let key = input.rawValue
         momentaryReleaseTasks[key]?.cancel()
         momentaryReleaseTasks[key] = nil
@@ -584,7 +583,7 @@ final class EmulatorSession: NSObject, ObservableObject {
         press(input)
     }
 
-    func releaseMomentary(_ input: MelonDSGameInput) {
+    func releaseMomentary(_ input: DuoInput) {
         let key = input.rawValue
         let elapsed = CACurrentMediaTime() - (momentaryPressTimes[key] ?? 0)
         let delay = max(0, 0.050 - elapsed)
@@ -611,7 +610,7 @@ final class EmulatorSession: NSObject, ObservableObject {
     }
 
     func releaseAllInputs() {
-        let inputs: [MelonDSGameInput] = [.a, .b, .x, .y, .l, .r, .start, .select, .up, .down, .left, .right, .lid]
+        let inputs: [DuoInput] = [.a, .b, .x, .y, .l, .r, .start, .select, .up, .down, .left, .right, .lid]
         inputs.forEach { release($0) }
         releaseTouch()
         setCirclePad(x: 0, y: 0)
@@ -779,20 +778,20 @@ final class EmulatorSession: NSObject, ObservableObject {
         guard runtimeConfiguration.isPro else { return }
         Task { @MainActor in
             for value in inputs {
-                guard let raw = Int(value), let input = MelonDSGameInput(rawValue: raw) else { continue }
+                guard let raw = Int(value), let input = DuoInput(rawValue: raw) else { continue }
                 press(input); try? await Task.sleep(for: .milliseconds(80)); release(input)
             }
         }
     }
 
-    private func mapped(_ input: MelonDSGameInput) -> MelonDSGameInput {
+    private func mapped(_ input: DuoInput) -> DuoInput {
         guard runtimeConfiguration.isPro,
               let value = runtimeConfiguration.preferences.buttonMapping[String(input.rawValue)],
-              let raw = Int(value), let mapped = MelonDSGameInput(rawValue: raw) else { return input }
+              let raw = Int(value), let mapped = DuoInput(rawValue: raw) else { return input }
         return mapped
     }
 
-    private func startTurbo(_ input: MelonDSGameInput) {
+    private func startTurbo(_ input: DuoInput) {
         let key = String(input.rawValue)
         guard turboTasks[key] == nil, let button = azaharButton(for: input) else { return }
         let core = azaharBridge
@@ -807,7 +806,7 @@ final class EmulatorSession: NSObject, ObservableObject {
         }
     }
 
-    private func azaharButton(for input: MelonDSGameInput) -> AzaharButton? {
+    private func azaharButton(for input: DuoInput) -> AzaharButton? {
         switch input {
         case .b: return AzaharButton(rawValue: 0)
         case .y: return AzaharButton(rawValue: 1)

@@ -1,5 +1,5 @@
 {
-  "_comment": "Settings > About > Open Source Licenses data. sourceURL placeholders are filled from Info.plist key DuoSourceCodeURL once the public repo exists. Commits marked TODO come from vendor/MANIFEST.tsv after tools/export_vendor.sh runs.",
+  "_comment": "Settings > About > Open Source Licenses data. sourceURL placeholders are filled from Info.plist key DuoSourceCodeURL once the public repo exists. Revisions marked TODO come from vendor/MANIFEST.tsv after tools/export_vendor.sh runs.",
   "appLicense": {
     "name": "Game Duo",
     "license": "GPL-3.0-or-later",
@@ -27,6 +27,17 @@
       "upstreamURL": "https://github.com/melonDS-emu/melonDS",
       "revision": "7117178c2dd56df32b6534ba6a54ad1f8547e693",
       "modified": false,
+      "sourceURL": "$(DuoSourceCodeURL)"
+    },
+    {
+      "name": "DeSmuME",
+      "role": "DS emulation core (HD rendering mode)",
+      "copyright": "Copyright (C) 2006 yopyop, 2008-2026 DeSmuME team",
+      "license": "GPL-2.0-or-later",
+      "licenseFile": "GPL-2.0.txt",
+      "upstreamURL": "https://github.com/libretro/desmume",
+      "revision": "TODO",
+      "modified": true,
       "sourceURL": "$(DuoSourceCodeURL)"
     },
     {
