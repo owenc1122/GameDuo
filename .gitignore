@@ -7,6 +7,8 @@
 !/THIRD_PARTY_NOTICES.md
 !/AGENTS.md
 !/.gitignore
+!/LICENSE
+!/README.md
 !/.github/
 .DS_Store
 xcuserdata/
