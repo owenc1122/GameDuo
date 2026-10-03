@@ -4,6 +4,7 @@
 !/DuoDS.xcworkspace/
 !/tools/
 !/DEPENDENCIES.md
+!/THIRD_PARTY_NOTICES.md
 !/AGENTS.md
 !/.gitignore
 .DS_Store

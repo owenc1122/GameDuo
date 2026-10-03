@@ -1,0 +1,132 @@
+{
+  "_comment": "Settings > About > Open Source Licenses data. sourceURL placeholders are filled from Info.plist key DuoSourceCodeURL once the public repo exists. Commits marked TODO come from vendor/MANIFEST.tsv after tools/export_vendor.sh runs.",
+  "appLicense": {
+    "name": "Game Duo",
+    "license": "GPL-3.0-or-later",
+    "licenseFile": "GPL-3.0.txt",
+    "sourceURL": "$(DuoSourceCodeURL)"
+  },
+  "components": [
+    {
+      "name": "melonDS DS",
+      "role": "DS emulation core",
+      "copyright": "Copyright (C) Jesse Talavera and melonDS DS contributors",
+      "license": "GPL-3.0-or-later",
+      "licenseFile": "GPL-3.0.txt",
+      "upstreamURL": "https://github.com/JesseTG/melonds-ds",
+      "revision": "bc4e4b67d2d470d7c682810a1e892cafd6f9082b",
+      "modified": true,
+      "sourceURL": "$(DuoSourceCodeURL)"
+    },
+    {
+      "name": "melonDS",
+      "role": "DS emulation core (used by melonDS DS)",
+      "copyright": "Copyright (C) Arisotura and melonDS team",
+      "license": "GPL-3.0-or-later",
+      "licenseFile": "GPL-3.0.txt",
+      "upstreamURL": "https://github.com/melonDS-emu/melonDS",
+      "revision": "7117178c2dd56df32b6534ba6a54ad1f8547e693",
+      "modified": false,
+      "sourceURL": "$(DuoSourceCodeURL)"
+    },
+    {
+      "name": "Azahar",
+      "role": "3DS emulation core",
+      "copyright": "Copyright (C) Azahar Emulator Project, Citra Emulator Project",
+      "license": "GPL-2.0-or-later",
+      "licenseFile": "GPL-2.0.txt",
+      "upstreamURL": "https://github.com/azahar-emu/azahar",
+      "revision": "c2237de04d8c08cb5ad0ba3fb98e5a9640203257",
+      "modified": true,
+      "sourceURL": "$(DuoSourceCodeURL)"
+    },
+    {
+      "name": "PPSSPP",
+      "role": "PSP emulation core and runtime assets",
+      "copyright": "Copyright (C) Henrik Rydgård and PPSSPP Project",
+      "license": "GPL-2.0-or-later",
+      "licenseFile": "GPL-2.0.txt",
+      "upstreamURL": "https://github.com/hrydgard/ppsspp",
+      "revision": "TODO",
+      "modified": true,
+      "sourceURL": "$(DuoSourceCodeURL)"
+    },
+    {
+      "name": "ParaLLEl N64",
+      "role": "N64 emulation core",
+      "copyright": "Copyright (C) libretro team, Mupen64Plus team and contributors",
+      "license": "GPL-2.0-or-later (components under LGPL and other licenses, see source tree)",
+      "licenseFile": "GPL-2.0.txt",
+      "upstreamURL": "https://github.com/libretro/parallel-n64",
+      "revision": "6e4c44c51885c8dc16e46d68464c517e6fca6712",
+      "modified": true,
+      "sourceURL": "$(DuoSourceCodeURL)"
+    },
+    {
+      "name": "Play!",
+      "role": "PS2 emulation core (WebAssembly)",
+      "copyright": "Copyright (c) 2006-2026, Jean-Philip Desjardins",
+      "license": "BSD-2-Clause",
+      "licenseFile": "BSD-2-Clause-Play.txt",
+      "upstreamURL": "https://github.com/jpd002/Play-",
+      "revision": "83700b2c31e593bc94e845b4b31b797be84dda59",
+      "modified": true,
+      "sourceURL": "$(DuoSourceCodeURL)"
+    },
+    {
+      "name": "libretro API",
+      "role": "Core interface header",
+      "copyright": "Copyright (C) 2010-2024 The RetroArch team",
+      "license": "MIT",
+      "licenseFile": "MIT-libretro-api.txt",
+      "upstreamURL": "https://github.com/libretro/libretro-common",
+      "revision": null,
+      "modified": false,
+      "sourceURL": null
+    },
+    {
+      "name": "libarchive",
+      "role": "Archive extraction (public headers; links the system library)",
+      "copyright": "Copyright (c) 2003-2018 Tim Kientzle and libarchive contributors",
+      "license": "BSD-2-Clause",
+      "licenseFile": "BSD-2-Clause-libarchive.txt",
+      "upstreamURL": "https://github.com/libarchive/libarchive",
+      "revision": "abaa707d92fce052f386b6cc2c8d0593ce61e639",
+      "modified": false,
+      "sourceURL": null
+    },
+    {
+      "name": "Fast-SRGAN",
+      "role": "Image upscaling model",
+      "copyright": "Copyright (c) 2019 Hasnain Raza",
+      "license": "MIT",
+      "licenseFile": "MIT-Fast-SRGAN.txt",
+      "upstreamURL": "https://github.com/HasnainRaz/Fast-SRGAN",
+      "revision": null,
+      "modified": false,
+      "sourceURL": null
+    },
+    {
+      "name": "Roboto Condensed",
+      "role": "Font (PPSSPP runtime assets)",
+      "copyright": "Copyright 2011 The Roboto Project Authors",
+      "license": "Apache-2.0",
+      "licenseFile": "Apache-2.0.txt",
+      "upstreamURL": "https://github.com/googlefonts/roboto-classic",
+      "revision": null,
+      "modified": false,
+      "sourceURL": null
+    },
+    {
+      "name": "Inconsolata",
+      "role": "Font (PPSSPP runtime assets)",
+      "copyright": "Copyright 2006 The Inconsolata Project Authors",
+      "license": "OFL-1.1",
+      "licenseFile": "OFL-1.1-Inconsolata.txt",
+      "upstreamURL": "https://github.com/googlefonts/Inconsolata",
+      "revision": null,
+      "modified": false,
+      "sourceURL": null
+    }
+  ]
+}
