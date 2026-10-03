@@ -36,7 +36,7 @@
       "license": "GPL-2.0-or-later",
       "licenseFile": "GPL-2.0.txt",
       "upstreamURL": "https://github.com/libretro/desmume",
-      "revision": "TODO",
+      "revision": "95b4d798731caa809125b6c3c11d17cc332ff6ef",
       "modified": true,
       "sourceURL": "$(DuoSourceCodeURL)"
     },
@@ -58,7 +58,7 @@
       "license": "GPL-2.0-or-later",
       "licenseFile": "GPL-2.0.txt",
       "upstreamURL": "https://github.com/hrydgard/ppsspp",
-      "revision": "TODO",
+      "revision": "a312749f832018c3989db06f4229be1c7e321daf",
       "modified": true,
       "sourceURL": "$(DuoSourceCodeURL)"
     },

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		D0D1A0000000000000000002 /* AudioRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D1A0000000000000000012 /* AudioRingBuffer.swift */; };
 		D0D1A0000000000000000001 /* DuoInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D1A0000000000000000011 /* DuoInput.swift */; };
+		D0C1CE05E0000000000000A1 /* Licenses in Resources */ = {isa = PBXBuildFile; fileRef = D0C1CE05E0000000000000A2 /* Licenses */; };
 		E2E2FA23E02C3EF9FCC42962 /* PS2Web in Resources */ = {isa = PBXBuildFile; fileRef = E2E29FFDAEAAC973A111B63F /* PS2Web */; };
 		E2E28E93FD49A4FA09C8C3EA /* PS2WebSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E288F56CD2528AB69F436F /* PS2WebSchemeHandler.swift */; };
 		E2E231B2BD99622A8FC9EFC0 /* PS2WebCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E263D335FB9BA03C82A3B4 /* PS2WebCore.swift */; };
@@ -100,6 +101,7 @@
 /* Begin PBXFileReference section */
 		D0D1A0000000000000000012 /* AudioRingBuffer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioRingBuffer.swift; sourceTree = "<group>"; };
 		D0D1A0000000000000000011 /* DuoInput.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DuoInput.swift; sourceTree = "<group>"; };
+		D0C1CE05E0000000000000A2 /* Licenses */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "DuoDS/Resources/Licenses"; sourceTree = SOURCE_ROOT; };
 		E2E29FFDAEAAC973A111B63F /* PS2Web */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "DuoDS/Resources/PS2Web"; sourceTree = SOURCE_ROOT; };
 		E2E288F56CD2528AB69F436F /* PS2WebSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PS2WebSchemeHandler.swift; path = Web/PS2WebSchemeHandler.swift; sourceTree = "<group>"; };
 		E2E263D335FB9BA03C82A3B4 /* PS2WebCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PS2WebCore.swift; path = Web/PS2WebCore.swift; sourceTree = "<group>"; };
@@ -403,6 +405,7 @@ D00D20000000000000000103,
 			C94DFBEF195147A28BEF7549 /* PSP-UMD-Case.usdz in Resources */,
 			E2E20C1DAE56B4512375E7EE /* PS2Audio in Resources */,
 			E2E2FA23E02C3EF9FCC42962 /* PS2Web in Resources */,
+			D0C1CE05E0000000000000A1 /* Licenses in Resources */,
 		);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

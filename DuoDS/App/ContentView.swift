@@ -661,6 +661,13 @@ private struct GameSettingsView: View {
                 }
                 .accessibilityHint(String(localized: "打开邮件应用，向 Duo 支持团队反馈问题"))
             }
+            Section(String(localized: "关于")) {
+                NavigationLink {
+                    OpenSourceLicensesView()
+                } label: {
+                    Label(String(localized: "开源许可"), systemImage: "doc.text")
+                }
+            }
             Section(String(localized: "Duo 进阶版")) {
                 NavigationLink {
                     if proEntitlement.isUnlocked {
@@ -3806,5 +3813,82 @@ private final class PSPSystemVolumeControl: MPVolumeView {
         #endif
         return true
         #endif
+    }
+}
+
+private struct OpenSourceNotices: Decodable {
+    struct Entry: Decodable, Identifiable {
+        var name: String
+        var role: String?
+        var copyright: String?
+        var license: String
+        var licenseFile: String
+        var upstreamURL: String?
+        var revision: String?
+        var modified: Bool?
+        var sourceURL: String?
+        var id: String { name }
+    }
+    var appLicense: Entry
+    var components: [Entry]
+
+    static let sourceCodeURL = "https://github.com/owenc1122/GameDuo"
+
+    static func load() -> OpenSourceNotices? {
+        guard let url = Bundle.main.url(forResource: "OpenSourceLicenses", withExtension: "json", subdirectory: "Licenses"),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(OpenSourceNotices.self, from: data)
+    }
+
+    static func licenseText(_ file: String) -> String {
+        guard let url = Bundle.main.url(forResource: file, withExtension: nil, subdirectory: "Licenses"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
+        return text
+    }
+}
+
+private struct OpenSourceLicensesView: View {
+    private let notices = OpenSourceNotices.load()
+
+    var body: some View {
+        List {
+            Section {
+                Text(String(localized: "Game Duo 以 GPL-3.0-or-later 开源，内置的模拟内核各自遵循其许可证。以下为内核名称、许可证与源码地址。"))
+                    .font(.footnote)
+                Link(destination: URL(string: OpenSourceNotices.sourceCodeURL)!) {
+                    Label(OpenSourceNotices.sourceCodeURL, systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+            }
+            if let notices {
+                Section {
+                    row(notices.appLicense)
+                }
+                Section(String(localized: "第三方组件")) {
+                    ForEach(notices.components) { row($0) }
+                }
+            }
+        }
+        .navigationTitle(String(localized: "开源许可"))
+    }
+
+    private func row(_ e: OpenSourceNotices.Entry) -> some View {
+        NavigationLink {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let c = e.copyright { Text(c).font(.footnote) }
+                    if let u = e.upstreamURL, let url = URL(string: u) { Link(u, destination: url).font(.footnote) }
+                    if let r = e.revision { Text("revision: \(r)").font(.caption.monospaced()) }
+                    Link(OpenSourceNotices.sourceCodeURL, destination: URL(string: OpenSourceNotices.sourceCodeURL)!).font(.footnote)
+                    Text(OpenSourceNotices.licenseText(e.licenseFile)).font(.caption.monospaced())
+                }
+                .padding()
+            }
+            .navigationTitle(e.name)
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(e.name)
+                Text(e.license).font(.caption).foregroundStyle(.secondary)
+            }
+        }
     }
 }
