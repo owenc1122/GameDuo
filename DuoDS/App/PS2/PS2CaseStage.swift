@@ -145,20 +145,16 @@ final class PS2CaseStage {
         return disc
     }
 
-    /// Like `applyBannerRule`: a label printed from the real cover already has its own artwork,
-    /// so the model's default label prints (PS logo box, "PlayStation 2" wordmark) are hidden;
-    /// the blank title label keeps them. The hub holograms on the data side always stay.
+    /// The model's label prints (PS logo box, "PlayStation 2" wordmark) are never shown
+    /// (`NeutralBranding`); the hub holograms on the data side stay.
     nonisolated static func applyDiscPrintRule(to disc: SCNNode, hasCover: Bool) {
-        for name in ["LABEL_PS_LOGO_BOX", "LABEL_WORDMARK"] {
-            disc.childNode(withName: name, recursively: true)?.isHidden = hasCover
-        }
+        NeutralBranding.hidePS2Prints(in: disc)
     }
 
-    /// Real covers (downloaded or local scans) already print the top "PlayStation 2" banner, so the
-    /// model's lid banner is hidden then; a blank insert, or a cover whose banner strip is blank
-    /// (`PS2CoverResolver.hasBlankBanner`), keeps it. Spine prints always stay.
+    /// The case's lid banner, spine logo band and tray emboss are never shown (`NeutralBranding`).
+    /// A real cover still carries its own printed banner.
     nonisolated static func applyBannerRule(to caseNode: SCNNode, hasCover: Bool) {
-        caseNode.childNode(withName: "TRADEMARK_PRINTS_LID", recursively: true)?.isHidden = hasCover
+        NeutralBranding.hidePS2Prints(in: caseNode)
     }
 
     private static func applyDiscLabel(_ texture: UIImage, to disc: SCNNode) {
@@ -233,6 +229,7 @@ enum PS2StageAssets {
               let scene = try? SCNScene(url: url),
               let node = scene.rootNode.childNode(withName: root, recursively: true) else { return nil }
         node.enumerateHierarchy { child, _ in child.removeAllAnimations() }
+        NeutralBranding.hidePS2Prints(in: node)
         return node
     }
 }

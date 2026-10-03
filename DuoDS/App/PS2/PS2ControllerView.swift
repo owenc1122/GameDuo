@@ -111,6 +111,7 @@ final class PS2ControllerModel {
             scene = SCNScene()
         }
         scene.rootNode.enumerateChildNodes { node, _ in node.removeAllAnimations() }
+        NeutralBranding.hidePS2Prints(in: scene.rootNode)
         for name in Self.movableNames {
             guard let node = scene.rootNode.childNode(withName: name, recursively: true) else { continue }
             nodes[name] = node

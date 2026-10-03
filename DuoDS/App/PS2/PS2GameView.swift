@@ -178,6 +178,7 @@ final class PS2RuntimeModel: ObservableObject {
         }
         let root = consoleScene.rootNode
         root.enumerateChildNodes { node, _ in node.removeAllAnimations() }
+        NeutralBranding.hidePS2Prints(in: root)
         consoleNode = root.childNode(withName: "PS2_CONSOLE", recursively: true)
         discTray = root.childNode(withName: "DISC_TRAY", recursively: true)
         trayRestPosition = discTray?.position ?? SCNVector3Zero

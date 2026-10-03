@@ -3070,6 +3070,7 @@ private struct PSP2000SceneView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> SCNView {
         let view = PSP2000InteractiveSCNView(frame: .zero)
+        NeutralBranding.applyConsole(to: model.scene.rootNode)
         view.scene = model.scene
         view.pointOfView = model.cameraNode
         view.runtimeModel = model

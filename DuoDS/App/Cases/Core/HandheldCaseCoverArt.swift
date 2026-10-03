@@ -438,7 +438,7 @@ struct HandheldCoverResolver: Sendable {
 ///   generated back, spine = generated (front's dominant colour, platform strip, title);
 /// - nothing: a generated placeholder with the platform's banner drawn as plain text.
 /// Real scans already carry the platform banner, so banners are only drawn on generated panels.
-/// `neutral` (App Review test games) draws no platform banner, spine strip or platform name at all.
+/// `neutral` (always, see `NeutralBranding`) draws no platform banner, spine strip or platform name at all.
 enum HandheldCaseInsert {
     // MARK: Banner geometry (mm, measured on GameTDB scans / RESEARCH.md)
 
